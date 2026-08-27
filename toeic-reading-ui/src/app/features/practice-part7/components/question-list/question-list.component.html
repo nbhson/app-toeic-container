@@ -1,0 +1,85 @@
+<!-- Question List Component Template for Part 7 -->
+<div class="questions-list-wrapper">
+  @for (q of questions(); track q.id; let qIdx = $index) {
+    <div
+      [id]="'q-card-' + q.questionNumber"
+      class="glass-card question-card"
+      [class.correct-border]="isSubmitted() && selectedAnswers()[q.id] === q.correctAnswer"
+      [class.incorrect-border]="isSubmitted() && selectedAnswers()[q.id] !== q.correctAnswer"
+    >
+      <!-- Card Header -->
+      <div class="question-header">
+        <span class="question-num-badge">Câu {{ q.questionNumber }}</span>
+      </div>
+
+      <!-- Question Prompt -->
+      <p class="question-prompt">{{ q.question }}</p>
+
+      <!-- Options -->
+      <div class="options-container">
+        @for (opt of q.options; track opt; let oIdx = $index) {
+          <button
+            [disabled]="isSubmitted()"
+            (click)="onOptionClick(q.id, oIdx)"
+            class="option-row"
+            [class.selected]="selectedAnswers()[q.id] === oIdx"
+            [class.correct]="isSubmitted() && q.correctAnswer === oIdx"
+            [class.incorrect]="
+              isSubmitted() && selectedAnswers()[q.id] === oIdx && q.correctAnswer !== oIdx
+            "
+          >
+            <span class="letter-badge">{{ getOptionLetter(oIdx) }}</span>
+            <span class="option-text">{{ opt }}</span>
+
+            @if (isSubmitted()) {
+              <div class="status-marker">
+                @if (q.correctAnswer === oIdx) {
+                  <svg
+                    class="icon-correct"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                } @else if (selectedAnswers()[q.id] === oIdx) {
+                  <svg
+                    class="icon-incorrect"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                }
+              </div>
+            }
+          </button>
+        }
+      </div>
+
+      <!-- Explanation & Translation -->
+      @if (isSubmitted()) {
+        <div class="explanation-box animate-fade">
+          <div class="translation-section">
+            <h5>Dịch câu hỏi & đáp án:</h5>
+            <p class="translation-text">{{ q.translation }}</p>
+          </div>
+          <div class="explanation-section">
+            <h5>Giải thích chi tiết:</h5>
+            <p class="explanation-text">{{ q.explanation }}</p>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

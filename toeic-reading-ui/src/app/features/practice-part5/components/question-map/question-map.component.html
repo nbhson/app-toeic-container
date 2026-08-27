@@ -1,0 +1,31 @@
+<div class="glass-card map-card">
+  <h3 class="map-title">Danh sách câu hỏi</h3>
+  <p class="map-desc">Bản đồ các câu hỏi trong bộ Part 5.</p>
+  
+  <div class="map-grid">
+    @for (q of questions(); track q.id; let idx = $index) {
+      <button (click)="questionSelected.emit(idx)"
+              class="map-btn"
+              [class.active]="currentIndex() === idx"
+              [class.answered-correct]="isQuestionCorrect(q.id)"
+              [class.answered-incorrect]="isQuestionIncorrect(q.id)">
+        {{ idx + 1 }}
+      </button>
+    }
+  </div>
+
+  <div class="map-legend">
+    <div class="legend-item">
+      <span class="legend-dot unanswered"></span>
+      <span>Chưa làm</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot correct"></span>
+      <span>Đúng</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot incorrect"></span>
+      <span>Sai</span>
+    </div>
+  </div>
+</div>

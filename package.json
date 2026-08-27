@@ -1,0 +1,25 @@
+{
+  "name": "toeic-container",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo cho TOEIC Reading App — Backend + Frontend",
+  "workspaces": [
+    "toeic-reading-be",
+    "toeic-reading-ui"
+  ],
+  "scripts": {
+    "dev:be": "npm run dev --workspace=toeic-reading-be",
+    "dev:ui": "npm run start --workspace=toeic-reading-ui",
+    "dev": "concurrently \"npm run dev:be\" \"npm run dev:ui\"",
+    "build:be": "npm run build --workspace=toeic-reading-be",
+    "build:ui": "npm run build --workspace=toeic-reading-ui",
+    "build": "npm run build --workspaces",
+    "test:be": "npm run test --workspace=toeic-reading-be",
+    "test:ui": "npm run test --workspace=toeic-reading-ui",
+    "test": "npm run test --workspaces",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

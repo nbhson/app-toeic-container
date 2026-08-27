@@ -1,0 +1,32 @@
+<!-- PassageContent component template for Part 7 -->
+<div class="passage-column animate-slide-up">
+  <div class="glass-card passage-card">
+    <div class="card-header">
+      <div class="header-badge-row">
+        <span class="badge badge-info"
+          >Đoạn văn {{ currentPassageIndex() + 1 }} / {{ totalPages() }}</span
+        >
+        <span class="badge" [class]="getPassageBadgeClass(passage().passageType)">
+          {{ passage().passageType }} Passage
+        </span>
+      </div>
+      <h3>{{ passage().documentType }}</h3>
+    </div>
+
+    <!-- Render English passage using innerHTML to support multiline/multipart HTML tags -->
+    <div class="passage-text" [innerHTML]="passage().text"></div>
+
+    <div class="passage-actions">
+      <button (click)="toggleTranslation()" class="btn-translate-toggle">
+        {{ showTranslation() ? 'Ẩn dịch nghĩa đoạn văn' : 'Xem dịch nghĩa đoạn văn' }}
+      </button>
+    </div>
+
+    @if (showTranslation()) {
+      <div class="passage-translation-box animate-slide-down">
+        <h4>Bản Dịch Nghĩa</h4>
+        <div class="translation-content" [innerHTML]="passage().translation"></div>
+      </div>
+    }
+  </div>
+</div>

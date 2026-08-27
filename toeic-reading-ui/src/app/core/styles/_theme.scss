@@ -1,0 +1,124 @@
+@use 'variables' as v;
+
+/* Theme Configurations */
+body.dark-theme {
+  --bg-primary: #09090b;
+  --bg-secondary: #121214;
+  --bg-tertiary: #1e1e24;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 32px -8px rgba(0, 0, 0, 0.8);
+
+  --glass-bg: rgba(18, 18, 20, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+  --card-bg: #18181b;
+  --card-hover-bg: #27272a;
+
+  /* Badges themed tokens */
+  --badge-grammar-bg: rgba(99, 102, 241, 0.12);
+  --badge-grammar-text: var(--indigo-light);
+  --badge-grammar-border: rgba(99, 102, 241, 0.25);
+
+  --badge-vocab-bg: rgba(236, 72, 153, 0.12);
+  --badge-vocab-text: var(--pink-light);
+  --badge-vocab-border: rgba(236, 72, 153, 0.25);
+
+  --badge-wordform-bg: rgba(14, 165, 233, 0.12);
+  --badge-wordform-text: var(--sky-light);
+  --badge-wordform-border: rgba(14, 165, 233, 0.25);
+
+  --badge-sentence-insertion-bg: rgba(16, 185, 129, 0.12);
+  --badge-sentence-insertion-text: var(--emerald-light);
+  --badge-sentence-insertion-border: rgba(16, 185, 129, 0.25);
+
+  --badge-single-passage-bg: rgba(139, 92, 246, 0.12);
+  --badge-single-passage-text: #a78bfa;
+  --badge-single-passage-border: rgba(139, 92, 246, 0.25);
+
+  --badge-double-passage-bg: rgba(245, 158, 11, 0.12);
+  --badge-double-passage-text: #fbbf24;
+  --badge-double-passage-border: rgba(245, 158, 11, 0.25);
+
+  --badge-triple-passage-bg: rgba(239, 68, 68, 0.12);
+  --badge-triple-passage-text: #fca5a5;
+  --badge-triple-passage-border: rgba(239, 68, 68, 0.25);
+
+  --badge-easy-bg: rgba(16, 185, 129, 0.12);
+  --badge-easy-text: var(--emerald-light);
+  --badge-medium-bg: rgba(245, 158, 11, 0.12);
+  --badge-medium-text: #fbbf24;
+  --badge-hard-bg: rgba(244, 63, 94, 0.12);
+  --badge-hard-text: #fb7185;
+
+  /* Shimmer themed tokens */
+  --shimmer-start: var(--bg-tertiary);
+  --shimmer-mid: var(--border-color);
+}
+
+body.light-theme {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --border-hover: rgba(15, 23, 42, 0.15);
+  --shadow-sm: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px -4px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 16px 32px -8px rgba(15, 23, 42, 0.08);
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(15, 23, 42, 0.04);
+  --glass-glow: 0 8px 32px 0 rgba(15, 23, 42, 0.05);
+
+  --card-bg: #ffffff;
+  --card-hover-bg: #f8fafc;
+
+  /* Badges themed tokens */
+  --badge-grammar-bg: rgba(99, 102, 241, 0.08);
+  --badge-grammar-text: #4f46e5;
+  --badge-grammar-border: rgba(99, 102, 241, 0.15);
+
+  --badge-vocab-bg: rgba(236, 72, 153, 0.08);
+  --badge-vocab-text: var(--pink);
+  --badge-vocab-border: rgba(236, 72, 153, 0.15);
+
+  --badge-wordform-bg: rgba(14, 165, 233, 0.08);
+  --badge-wordform-text: var(--sky);
+  --badge-wordform-border: rgba(14, 165, 233, 0.15);
+
+  --badge-sentence-insertion-bg: rgba(16, 185, 129, 0.08);
+  --badge-sentence-insertion-text: var(--success-hover);
+  --badge-sentence-insertion-border: rgba(16, 185, 129, 0.15);
+
+  --badge-single-passage-bg: rgba(139, 92, 246, 0.08);
+  --badge-single-passage-text: #7c3aed;
+  --badge-single-passage-border: rgba(139, 92, 246, 0.15);
+
+  --badge-double-passage-bg: rgba(245, 158, 11, 0.08);
+  --badge-double-passage-text: #d97706;
+  --badge-double-passage-border: rgba(245, 158, 11, 0.15);
+
+  --badge-triple-passage-bg: rgba(239, 68, 68, 0.08);
+  --badge-triple-passage-text: #dc2626;
+  --badge-triple-passage-border: rgba(239, 68, 68, 0.15);
+
+  --badge-easy-bg: rgba(16, 185, 129, 0.08);
+  --badge-easy-text: var(--success-hover);
+  --badge-medium-bg: rgba(245, 158, 11, 0.08);
+  --badge-medium-text: var(--warning-hover);
+  --badge-hard-bg: rgba(244, 63, 94, 0.08);
+  --badge-hard-text: var(--danger-hover);
+
+  /* Shimmer themed tokens */
+  --shimmer-start: #f1f5f9;
+  --shimmer-mid: #e2e8f0;
+}

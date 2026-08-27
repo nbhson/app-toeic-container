@@ -1,0 +1,114 @@
+<!-- Progress Header -->
+<div class="glass-card progress-card animate-slide-up" style="animation-delay: 0.05s">
+  <div class="progress-info">
+    <span class="progress-title">Tiến độ luyện tập</span>
+    <span class="progress-text">Câu {{ currentIndex() + 1 }} / {{ totalQuestions() }}</span>
+  </div>
+  <div class="progress-track-bg">
+    <div class="progress-track-fill" [style.width.%]="progressPercentage()"></div>
+  </div>
+</div>
+
+<!-- Question Board -->
+<div class="glass-card question-board animate-slide-up" style="animation-delay: 0.1s">
+  <!-- Badges -->
+  <div class="board-badges">
+    <span class="badge" [class.badge-grammar]="question().category === 'Grammar'"
+                        [class.badge-vocabulary]="question().category === 'Vocabulary'"
+                        [class.badge-wordform]="question().category === 'Word Forms'">
+      {{ question().category === 'Grammar' ? 'Ngữ pháp' : (question().category === 'Vocabulary' ? 'Từ vựng' : 'Từ loại') }}
+    </span>
+    <span class="badge" [class.badge-easy]="question().difficulty === 'Easy'"
+                        [class.badge-medium]="question().difficulty === 'Medium'"
+                        [class.badge-hard]="question().difficulty === 'Hard'">
+      {{ question().difficulty === 'Easy' ? 'Dễ' : (question().difficulty === 'Medium' ? 'Trung bình' : 'Khó') }}
+    </span>
+  </div>
+
+  <!-- Question Text -->
+  <div class="question-text">
+    <span class="q-number">Q{{ currentIndex() + 1 }}:</span>
+    <p>{{ question().question }}</p>
+  </div>
+
+  <!-- Option Choices -->
+  <div class="options-container">
+    @for (option of question().options; track option; let i = $index) {
+      <button (click)="optionSelected.emit(i)"
+              [disabled]="isSubmitted()"
+              class="option-btn animate-pop"
+              [style.animation-delay]="i * 0.05 + 's'"
+              [class.selected]="selectedOption() === i"
+              [class.correct]="isSubmitted() && question().correctAnswer === i"
+              [class.incorrect]="isSubmitted() && selectedOption() === i && question().correctAnswer !== i">
+        <span class="option-letter" [class.selected-letter]="selectedOption() === i"
+                                    [class.correct-letter]="isSubmitted() && question().correctAnswer === i"
+                                    [class.incorrect-letter]="isSubmitted() && selectedOption() === i && question().correctAnswer !== i">
+          {{ getOptionLetter(i) }}
+        </span>
+        <span class="option-content">{{ option }}</span>
+        
+        <!-- Result Icons -->
+        @if (isSubmitted() && question().correctAnswer === i) {
+          <span class="option-status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </span>
+        }
+        @if (isSubmitted() && selectedOption() === i && question().correctAnswer !== i) {
+          <span class="option-status-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-danger"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </span>
+        }
+      </button>
+    }
+  </div>
+
+  <!-- Navigation & Actions -->
+  <div class="board-actions">
+    <button (click)="prevPressed.emit()" [disabled]="currentIndex() === 0" class="btn-nav">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      Trước đó
+    </button>
+    
+    @if (!isSubmitted()) {
+      <button (click)="answerSubmitted.emit()" [disabled]="selectedOption() === null" class="btn-submit-answer">
+        Kiểm tra đáp án
+      </button>
+    }
+    
+    @if (isSubmitted() && currentIndex() < totalQuestions() - 1) {
+      <button (click)="nextPressed.emit()" class="btn-next-question">
+        Câu tiếp theo
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    }
+
+    @if (!isSubmitted()) {
+      <button (click)="nextPressed.emit()" [disabled]="currentIndex() === totalQuestions() - 1" class="btn-nav">
+        Tiếp theo
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    }
+  </div>
+</div>
+
+<!-- Explanation Panel -->
+@if (isSubmitted()) {
+  <div class="glass-card explanation-panel animate-slide-up">
+    <div class="explanation-header">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+      <h3>Giải thích & Dịch nghĩa</h3>
+    </div>
+    <div class="explanation-body">
+      <div class="translation-block">
+        <h4>Dịch nghĩa câu:</h4>
+        <p class="translation-text">"{{ question().translation }}"</p>
+      </div>
+      <div class="divider"></div>
+      <div class="grammar-block">
+        <h4>Giải thích ngữ pháp:</h4>
+        <p class="explanation-text">{{ question().explanation }}</p>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,75 @@
+@use 'sass:map';
+
+/* Custom UI Utility Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+// Badge category configurations map for SCSS loop generation
+$badge-types: (
+  'grammar': (
+    bg: var(--badge-grammar-bg),
+    text: var(--badge-grammar-text),
+    border: var(--badge-grammar-border),
+  ),
+  'vocabulary': (
+    bg: var(--badge-vocab-bg),
+    text: var(--badge-vocab-text),
+    border: var(--badge-vocab-border),
+  ),
+  'wordform': (
+    bg: var(--badge-wordform-bg),
+    text: var(--badge-wordform-text),
+    border: var(--badge-wordform-border),
+  ),
+  'sentence-insertion': (
+    bg: var(--badge-sentence-insertion-bg),
+    text: var(--badge-sentence-insertion-text),
+    border: var(--badge-sentence-insertion-border),
+  ),
+  'single-passage': (
+    bg: var(--badge-single-passage-bg),
+    text: var(--badge-single-passage-text),
+    border: var(--badge-single-passage-border),
+  ),
+  'double-passage': (
+    bg: var(--badge-double-passage-bg),
+    text: var(--badge-double-passage-text),
+    border: var(--badge-double-passage-border),
+  ),
+  'triple-passage': (
+    bg: var(--badge-triple-passage-bg),
+    text: var(--badge-triple-passage-text),
+    border: var(--badge-triple-passage-border),
+  ),
+  'easy': (
+    bg: var(--badge-easy-bg),
+    text: var(--badge-easy-text),
+  ),
+  'medium': (
+    bg: var(--badge-medium-bg),
+    text: var(--badge-medium-text),
+  ),
+  'hard': (
+    bg: var(--badge-hard-bg),
+    text: var(--badge-hard-text),
+  ),
+);
+
+@each $type, $props in $badge-types {
+  .badge-#{$type} {
+    background-color: map.get($props, bg);
+    color: map.get($props, text);
+    @if map.has-key($props, border) {
+      border: 1px solid map.get($props, border);
+    }
+  }
+}

@@ -1,0 +1,58 @@
+@use 'variables' as v;
+
+/* Reusable SCSS Mixins and Placeholders */
+
+// Glassmorphism Panel Mixin
+@mixin glass-panel($padding: 1.5rem, $radius: var(--radius-lg)) {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-glow), var(--shadow-sm);
+  border-radius: $radius;
+  padding: $padding;
+  transition: var(--transition-normal);
+
+  &:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--glass-glow), var(--shadow-md);
+  }
+}
+
+// Button Base Styles Mixin
+@mixin btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: var(--transition-normal);
+  cursor: pointer;
+  border: none;
+  outline: none;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+// Colored/Themed Button Mixin
+@mixin btn-theme($bg-var, $hover-bg-var, $shadow-color) {
+  @include btn-base;
+  background-color: $bg-var;
+  color: v.$white;
+  box-shadow: 0 4px 12px $shadow-color;
+
+  &:hover {
+    background-color: $hover-bg-var;
+    box-shadow: 0 6px 16px color-mix(in srgb, $hover-bg-var 35%, transparent);
+  }
+}

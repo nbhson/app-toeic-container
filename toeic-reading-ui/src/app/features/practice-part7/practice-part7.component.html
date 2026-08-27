@@ -1,0 +1,277 @@
+@if (practiceMode() === null) {
+  <!-- Mode Selection View -->
+  <div class="practice-container animate-fade">
+    <div class="glass-card mode-selection-card animate-slide-up">
+      <div class="selection-header">
+        <h2>Luyện Tập TOEIC Reading Part 7</h2>
+        <p>Chọn chế độ luyện tập đọc hiểu (Reading Comprehension) bám sát đề thi thực tế.</p>
+      </div>
+
+      <div class="modes-grid">
+        <!-- Mini-Test -->
+        <div class="mode-card glass-panel" (click)="selectMode('mini')">
+          <div class="mode-icon-wrapper mini-bg">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              class="mode-icon"
+            >
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+            </svg>
+          </div>
+          <h3>Luyện Tập Rút Gọn (Mini-Test)</h3>
+          <p>
+            Luyện tập nhanh với 2 đoạn văn (1 Đơn và 1 Kép/Ba) gồm khoảng 8 - 10 câu hỏi. Phù hợp để
+            ôn tập nhanh trong thời gian ngắn.
+          </p>
+          <button class="btn-select-mode">Bắt đầu Mini-Test</button>
+        </div>
+
+        <!-- Full Test -->
+        <div class="mode-card glass-panel" (click)="selectMode('full')">
+          <div class="mode-icon-wrapper full-bg">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              class="mode-icon"
+            >
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+              <path d="M6 6h10"></path>
+              <path d="M6 10h10"></path>
+            </svg>
+          </div>
+          <h3>Luyện Tập Toàn Bộ (Full Mock Test)</h3>
+          <p>
+            Thử thách bản thân với đầy đủ 54 câu hỏi (từ Câu 147 đến 200) gồm 15 đoạn văn (10 Đơn, 2
+            Kép, 3 Ba) đúng cấu trúc đề thi thật.
+          </p>
+          <button class="btn-select-mode btn-purple-mode">Bắt đầu Full Test</button>
+        </div>
+      </div>
+    </div>
+  </div>
+} @else if (errorMessage()) {
+  <!-- Missing API Key or Load Error State -->
+  <div class="practice-container animate-fade">
+    <div class="glass-card error-card animate-slide-up">
+      <div class="error-header">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="text-warning"
+        >
+          <path
+            d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+          ></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <h2>Yêu cầu Cấu hình API Key</h2>
+      </div>
+      <p class="error-message">{{ errorMessage() }}</p>
+      <div class="error-actions">
+        <button (click)="openSettings()" class="btn-configure">Cấu hình AI Provider</button>
+        <button (click)="resetSession()" class="btn-secondary">Quay lại chọn chế độ</button>
+      </div>
+    </div>
+  </div>
+} @else if (isLoading()) {
+  <!-- Shimmer Skeleton Loading State -->
+  <div class="practice-container animate-fade">
+    <div class="loading-announcement glass-card animate-slide-up">
+      <div class="spinner"></div>
+      <h3>Đang khởi tạo dữ liệu TOEIC Part 7...</h3>
+      <p>
+        AI đang sinh các văn bản đọc hiểu, câu hỏi, bản dịch và lời giải chi tiết. Quá trình
+        này có thể mất vài phút đối với Full Mock Test do số lượng lớn câu hỏi cần sinh.
+        Vui lòng không đóng trang.
+      </p>
+    </div>
+
+    <div class="passage-tabs-card glass-card shimmer-card">
+      <div class="shimmer-badges">
+        <div class="shimmer-bar badge-shimmer"></div>
+        <div class="shimmer-bar badge-shimmer"></div>
+        <div class="shimmer-bar badge-shimmer"></div>
+      </div>
+    </div>
+
+    <div class="practice-main-grid">
+      <!-- Left side shimmer -->
+      <div class="passage-column">
+        <div class="glass-card passage-card shimmer-card">
+          <div class="shimmer-bar title-shimmer"></div>
+          <div class="shimmer-bar desc-shimmer"></div>
+          <div class="shimmer-bar text-shimmer"></div>
+          <div class="shimmer-bar text-shimmer"></div>
+          <div class="shimmer-bar text-shimmer"></div>
+        </div>
+      </div>
+
+      <!-- Right side shimmer -->
+      <div class="questions-column">
+        <div class="glass-card question-card shimmer-card">
+          <div class="shimmer-bar title-shimmer"></div>
+          <div class="shimmer-bar text-shimmer"></div>
+          <div class="shimmer-options">
+            <div class="shimmer-bar option-shimmer"></div>
+            <div class="shimmer-bar option-shimmer"></div>
+            <div class="shimmer-bar option-shimmer"></div>
+            <div class="shimmer-bar option-shimmer"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+} @else if (passages().length > 0) {
+  <div class="practice-container animate-fade">
+    <!-- Top Nav Tabs & Action Controls -->
+    <div class="passage-tabs-card glass-card">
+      <div class="tabs-header-row">
+        <div class="passage-tabs">
+          @for (p of passages(); track p.id; let idx = $index) {
+            <button
+              (click)="goToPassage(idx)"
+              class="tab-btn"
+              [class.active]="idx === currentPassageIndex()"
+            >
+              <span class="tab-indicator" [class.submitted]="isSubmitted()[p.id]"></span>
+              Đoạn {{ idx + 1 }}
+            </button>
+          }
+        </div>
+        <button (click)="resetSession()" class="btn-exit" title="Thoát phiên làm bài">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          Thoát
+        </button>
+      </div>
+    </div>
+
+    <!-- Dual Pane Split Content Grid -->
+    <div class="practice-main-grid">
+      <app-passage-content
+        [passage]="currentPassage()"
+        [currentPassageIndex]="currentPassageIndex()"
+        [totalPages]="passages().length"
+        [isSubmitted]="isSubmitted()[currentPassage().id]"
+      ></app-passage-content>
+
+      <div class="questions-column animate-slide-up" style="animation-delay: 0.1s">
+        <app-question-list
+          [questions]="currentPassage().questions"
+          [selectedAnswers]="selectedAnswers()"
+          [isSubmitted]="isSubmitted()[currentPassage().id]"
+          [currentPassageId]="currentPassage().id"
+          (selectOption)="selectOption($event.questionId, $event.optionIdx)"
+        ></app-question-list>
+
+        <!-- Submit Section for the active passage -->
+        <div class="submission-card">
+          @if (!isSubmitted()[currentPassage().id]) {
+            <button
+              (click)="submitPassage(currentPassage().id)"
+              class="btn-submit-passage animate-pulse"
+            >
+              Nộp bài Đoạn văn {{ currentPassageIndex() + 1 }}
+            </button>
+          } @else {
+            <div class="submitted-announcement">
+              <div class="submission-success-msg">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-success"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Đã nộp bài thành công!</span>
+              </div>
+
+              <div class="submission-navigation-actions">
+                @if (currentPassageIndex() < passages().length - 1) {
+                  <button (click)="nextPassage()" class="btn-next-passage">
+                    Đoạn văn tiếp theo
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                  </button>
+                } @else {
+                  <button (click)="resetSession()" class="btn-restart">
+                    Luyện tập đề thi mới
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                    </svg>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmLeaveModal()) {
+  <app-confirm-modal
+    (confirm)="onConfirmLeaveResponse(true)"
+    (cancel)="onConfirmLeaveResponse(false)"
+  >
+  </app-confirm-modal>
+}

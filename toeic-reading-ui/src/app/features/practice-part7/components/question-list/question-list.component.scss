@@ -1,0 +1,178 @@
+@use '../../../../core/styles/variables' as v;
+
+.questions-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.question-card {
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition:
+    var(--transition-normal),
+    border-color 0.4s ease;
+}
+
+.question-card.correct-border {
+  border-color: var(--success);
+}
+
+.question-card.incorrect-border {
+  border-color: var(--danger);
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.question-num-badge {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.question-prompt {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0 0 1rem 0;
+}
+
+/* Options Lists */
+.options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background-color: var(--hover);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.option-row:hover:not(:disabled) {
+  border-color: var(--text-secondary);
+  background-color: var(--border-color);
+}
+
+.option-row.selected {
+  border-color: var(--primary);
+  background-color: rgba(99, 102, 241, 0.08);
+}
+
+.option-row.correct {
+  border-color: var(--success);
+  background-color: rgba(16, 185, 129, 0.08);
+  color: var(--success);
+  font-weight: 600;
+}
+
+.option-row.incorrect {
+  border-color: var(--danger);
+  background-color: rgba(239, 68, 68, 0.08);
+  color: var(--danger);
+}
+
+.letter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.option-row.selected .letter-badge {
+  background-color: var(--primary);
+  color: v.$white;
+}
+
+.option-row.correct .letter-badge {
+  background-color: var(--success);
+  color: v.$white;
+}
+
+.option-row.incorrect .letter-badge {
+  background-color: var(--danger);
+  color: v.$white;
+}
+
+.option-text {
+  flex-grow: 1;
+  line-height: 1.4;
+}
+
+.status-marker {
+  margin-left: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.icon-correct {
+  width: 18px;
+  height: 18px;
+  color: var(--success);
+}
+
+.icon-incorrect {
+  width: 18px;
+  height: 18px;
+  color: var(--danger);
+}
+
+/* Explanations block */
+.explanation-box {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.translation-section,
+.explanation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.explanation-box h5 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.translation-text,
+.explanation-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.translation-text {
+  font-style: italic;
+}

@@ -1,0 +1,45 @@
+# ──────────────────────────────────────────────────────────────────────
+#  TOEIC Container — Docker Compose
+#  Services: Backend (API) + Frontend (Angular)
+#  OmniRoute chạy trên host machine (http://localhost:20128)
+# ──────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Redis (rate limiter backend cho OmniRoute) ─────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Backend (TOEIC Reading API) ────────────────────────
+  backend:
+    build: ./toeic-reading-be
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    env_file:
+      - ./toeic-reading-be/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── Frontend (Angular + Nginx) ─────────────────────────
+  frontend:
+    build: ./toeic-reading-ui
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  redis-data:
+    name: omniroute-redis-data

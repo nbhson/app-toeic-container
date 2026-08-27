@@ -1,0 +1,40 @@
+<!-- PassageContent component template -->
+<div class="passage-column animate-slide-up">
+  <div class="glass-card passage-card">
+    <div class="card-header">
+      <span class="badge badge-info">Đoạn văn {{ currentPassageIndex() + 1 }} / {{ totalPages() }}</span>
+      <h3>Đọc Điền Từ (Text Completion)</h3>
+    </div>
+
+    <div class="passage-text">
+      @for (seg of getPassageSegments(passage().text); track $index) {
+        @if (isGapMarker(seg)) {
+          <button
+            (click)="onGapClick(getGapNumber(seg))"
+            class="gap-badge-anchor"
+            [class.answered]="hasAnsweredGap(getGapNumber(seg))"
+            [class.correct]="isSubmitted() && isGapCorrect(getGapNumber(seg))"
+            [class.incorrect]="isSubmitted() && !isGapCorrect(getGapNumber(seg))"
+            aria-label="Xem câu hỏi cho vị trí này">
+            {{ seg }}
+          </button>
+        } @else {
+          <span class="passage-txt-segment">{{ seg }}</span>
+        }
+      }
+    </div>
+
+    <div class="passage-actions">
+      <button (click)="toggleTranslation()" class="btn-translate-toggle">
+        {{ showTranslation() ? 'Ẩn dịch nghĩa đoạn văn' : 'Xem dịch nghĩa đoạn văn' }}
+      </button>
+    </div>
+
+    @if (showTranslation()) {
+      <div class="passage-translation-box animate-slide-down">
+        <h4>Bản Dịch Nghĩa</h4>
+        <p>{{ passage().translation }}</p>
+      </div>
+    }
+  </div>
+</div>

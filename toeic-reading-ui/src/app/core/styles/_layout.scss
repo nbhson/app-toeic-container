@@ -1,0 +1,30 @@
+@use 'mixins' as *;
+
+/* Basic Layout Grid */
+.layout-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  padding: 2rem;
+  margin-left: 280px; /* Width of sidebar */
+  transition: var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 992px) {
+  .main-content {
+    margin-left: 0;
+    padding-top: 1.5rem;
+    padding-bottom: 90px; /* Prevent bottom sidebar overlap */
+  }
+}
+
+/* Glassmorphism card utility */
+.glass-card {
+  @include glass-panel;
+}

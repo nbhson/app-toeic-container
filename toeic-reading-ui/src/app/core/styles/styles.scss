@@ -1,0 +1,66 @@
+@use 'sass:map';
+@use 'variables' as v;
+@use 'mixins' as *;
+@use 'theme';
+@use 'reset';
+@use 'animations';
+@use 'layout';
+@use 'badges';
+@use 'shimmer';
+
+:root {
+  /* Common Constants */
+  --primary: #{v.$primary};
+  --primary-hover: #{v.$primary-hover};
+  --primary-light: #{v.$primary-light};
+
+  --success: #{v.$success};
+  --success-hover: #{v.$success-hover};
+  --success-light: #{v.$success-light};
+
+  --danger: #{v.$danger};
+  --danger-hover: #{v.$danger-hover};
+  --danger-light: #{v.$danger-light};
+
+  --warning: #{v.$warning};
+  --warning-hover: #{v.$warning-hover};
+  --warning-light: #{v.$warning-light};
+
+  --info: #{v.$info};
+  --info-light: #{v.$info-light};
+
+  --radius-sm: #{v.$radius-sm};
+  --radius-md: #{v.$radius-md};
+  --radius-lg: #{v.$radius-lg};
+  --radius-xl: #{v.$radius-xl};
+
+  --transition-fast: #{v.$transition-fast};
+  --transition-normal: #{v.$transition-normal};
+  --transition-slow: #{v.$transition-slow};
+
+  --font-sans: #{v.$font-sans};
+
+  /* Theme-independent color tokens */
+  --purple: #{v.$purple};
+  --purple-hover: #{v.$purple-hover};
+  --indigo-light: #{v.$indigo-light};
+  --pink: #{v.$pink};
+  --pink-light: #{v.$pink-light};
+  --sky: #{v.$sky};
+  --sky-light: #{v.$sky-light};
+  --emerald-light: #{v.$emerald-light};
+
+  /* Symmetrical gradient tokens */
+  --grammar-gradient: linear-gradient(90deg, var(--primary) 0%, var(--indigo-light) 100%);
+  --vocab-gradient: linear-gradient(90deg, var(--pink) 0%, var(--pink-light) 100%);
+  --wordform-gradient: linear-gradient(90deg, var(--sky) 0%, var(--sky-light) 100%);
+  --sentence-insertion-gradient: linear-gradient(
+    90deg,
+    var(--success) 0%,
+    var(--emerald-light) 100%
+  );
+  --single-passage-gradient: linear-gradient(90deg, var(--purple) 0%, #c084fc 100%);
+  --double-passage-gradient: linear-gradient(90deg, var(--warning) 0%, #fbd561 100%);
+  --triple-passage-gradient: linear-gradient(90deg, var(--danger) 0%, #fda4af 100%);
+  --logo-gradient: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
+}

@@ -1,0 +1,81 @@
+@use '../../core/styles/variables' as v;
+@use '../../core/styles/mixins' as *;
+
+.practice-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: 4rem;
+}
+
+.practice-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .practice-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.question-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.navigator-column {
+  position: sticky;
+  top: 2rem;
+}
+
+/* API Key Error Card Styles */
+.error-card {
+  max-width: 550px;
+  margin: 4rem auto;
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-top: 4px solid var(--warning);
+}
+
+.error-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.error-header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.error-message {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  max-width: 420px;
+}
+
+.btn-configure {
+  @include btn-theme(var(--primary), var(--primary-hover), rgba(99, 102, 241, 0.2));
+  font-size: 0.9rem;
+}
+
+.btn-configure svg {
+  transition: transform 0.4s ease;
+}
+
+.btn-configure:hover svg {
+  transform: rotate(30deg);
+}
