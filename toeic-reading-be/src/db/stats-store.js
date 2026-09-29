@@ -14,6 +14,49 @@ const DEFAULT_DATA_DIR = join(__dirname, '../../data');
 const STATS_DIRNAME = 'stats';
 
 /**
+ * Maximum history entries kept per user. The file is trimmed (oldest first)
+ * on every save so stats files never grow unbounded.
+ * Override with the MAX_HISTORY_SIZE env var.
+ */
+export const MAX_HISTORY_SIZE = parseInt(process.env.MAX_HISTORY_SIZE || '200', 10) || 200;
+
+/**
+ * Derives a weak-point analysis from a stats object (pure function, no I/O).
+ * @param {object|null} stats - User stats or null.
+ * @returns {{ overall: object, byCategory: Array, weakest: Array, recentWrong: Array }}
+ */
+export function analyzeStats(stats) {
+  const empty = {
+    overall: { answered: 0, correct: 0, accuracy: 0 },
+    byCategory: [],
+    weakest: [],
+    recentWrong: [],
+  };
+  if (!stats || typeof stats !== 'object') return empty;
+  const catStats = stats.categoryStats && typeof stats.categoryStats === 'object' ? stats.categoryStats : {};
+  const byCategory = Object.entries(catStats).map(([category, v]) => {
+    const answered = Number(v?.answered) || 0;
+    const correct = Number(v?.correct) || 0;
+    return { category, answered, correct, accuracy: answered === 0 ? 0 : Math.round((correct / answered) * 1000) / 10 };
+  });
+  const answered = byCategory.reduce((n, c) => n + c.answered, 0);
+  const correct = byCategory.reduce((n, c) => n + c.correct, 0);
+  // Weakest = attempted categories (min 3 answers) sorted by accuracy ascending, top 3.
+  const weakest = byCategory
+    .filter((c) => c.answered >= 3)
+    .sort((a, b) => a.accuracy - b.accuracy || b.answered - a.answered)
+    .slice(0, 3);
+  const history = Array.isArray(stats.history) ? stats.history : [];
+  const recentWrong = history.filter((h) => h && h.isCorrect === false).slice(-10).reverse();
+  return {
+    overall: { answered, correct, accuracy: answered === 0 ? 0 : Math.round((correct / answered) * 1000) / 10 },
+    byCategory: byCategory.sort((a, b) => b.answered - a.answered),
+    weakest,
+    recentWrong,
+  };
+}
+
+/**
  * Creates a stats store instance with the given data directory.
  * @param {string} dataDir - Base data directory (stats will be in dataDir/stats/)
  * @returns {{ getStats: Function, saveStats: Function, deleteStats: Function, listUsers: Function }}
@@ -69,13 +112,18 @@ export function createStatsStore(dataDir = DEFAULT_DATA_DIR) {
 
   /**
    * Saves stats for a specific user (full replacement).
+   * History is trimmed to MAX_HISTORY_SIZE (oldest first) to bound file size.
    * @param {string} userId
    * @param {object} stats - The complete stats object to save.
    */
   function saveStats(userId, stats) {
     ensureStatsDir();
     const filePath = getStatsPath(userId);
-    writeFileSync(filePath, JSON.stringify(stats, null, 2), 'utf-8');
+    const toSave = { ...stats };
+    if (Array.isArray(toSave.history) && toSave.history.length > MAX_HISTORY_SIZE) {
+      toSave.history = toSave.history.slice(toSave.history.length - MAX_HISTORY_SIZE);
+    }
+    writeFileSync(filePath, JSON.stringify(toSave, null, 2), 'utf-8');
   }
 
   /**

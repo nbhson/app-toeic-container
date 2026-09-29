@@ -7,7 +7,7 @@ import {
   ToeicPart7Passage,
   UserStats,
 } from '../models/toeic.model';
-import { STORAGE_KEYS, CATEGORIES, AIProvider, BE_STATS_URL, getUserId } from '../constants/app.constants';
+import { STORAGE_KEYS, CATEGORIES, AIProvider, BE_STATS_URL, BE_BANK_URL, BE_READING_TEST_URL, getUserId } from '../constants/app.constants';
 import { GeminiService } from './gemini.service';
 import { OmnirouteService } from './omniroute.service';
 
@@ -563,6 +563,97 @@ export class ToeicService {
     } catch (error) {
       console.warn('Could not save stats to BE:', error);
     }
+  }
+
+  // ── Full Reading Test + Question Bank + Analysis (BE) ───────
+
+  /**
+   * Fetches the official full Reading test structure (100 questions / 75 min).
+   * Falls back to the built-in constant when the BE is unreachable.
+   */
+  async getReadingTestConfig(): Promise<{
+    totalQuestions: number;
+    timeLimitMinutes: number;
+    parts: Array<{ part: number; count: number; numbers: string; title: string }>;
+  }> {
+    try {
+      const res = await fetch(`${BE_READING_TEST_URL}/config`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('Could not load reading-test config from BE:', e);
+    }
+    return {
+      totalQuestions: 100,
+      timeLimitMinutes: 75,
+      parts: [
+        { part: 5, count: 30, numbers: '101-130', title: 'Incomplete Sentences' },
+        { part: 6, count: 16, numbers: '131-146', title: 'Text Completion' },
+        { part: 7, count: 54, numbers: '147-200', title: 'Reading Comprehension' },
+      ],
+    };
+  }
+
+  /**
+   * Scores a finished test via the BE (TOEIC Reading 5-495 approximation).
+   */
+  async scoreReadingTest(
+    answers: Array<{ selectedAnswer: number; correctAnswer: number }>,
+  ): Promise<{ correct: number; total: number; percent: number; score: number; level: string }> {
+    const res = await fetch(`${BE_READING_TEST_URL}/score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers }),
+    });
+    if (!res.ok) throw new Error('Không thể chấm điểm bài thi, vui lòng thử lại.');
+    return await res.json();
+  }
+
+  /**
+   * Fetches cached bank items for offline practice (no AI call, no key needed).
+   */
+  async getBankItems(
+    part: 'part5' | 'part6' | 'part7-Single' | 'part7-Double' | 'part7-Triple',
+    limit = 10,
+  ): Promise<{ part: string; returned: number; items: any[] }> {
+    const res = await fetch(`${BE_BANK_URL}/${part}?limit=${limit}`);
+    if (!res.ok) throw new Error('Không thể tải ngân hàng câu hỏi.');
+    return await res.json();
+  }
+
+  /**
+   * Fetches weak-point analysis from the BE (per-category accuracy, weakest
+   * categories, 10 most recent wrong answers).
+   */
+  async getWeakPointAnalysis(): Promise<{
+    overall: { answered: number; correct: number; accuracy: number };
+    byCategory: Array<{ category: string; answered: number; correct: number; accuracy: number }>;
+    weakest: Array<{ category: string; answered: number; correct: number; accuracy: number }>;
+    recentWrong: UserStats['history'];
+  } | null> {
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_STATS_URL}/${userId}/analysis`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn('Could not load analysis from BE:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Review queue (spaced-repetition cơ bản): các câu từng trả lời SAI và chưa
+   * bao giờ được sửa đúng sau đó. Sắp xếp: câu sai cũ nhất chưa sửa lên trước,
+   * giới hạn `limit` câu.
+   */
+  getReviewQueue(limit = 20): UserStats['history'] {
+    const history = this.stats().history;
+    const corrected = new Set(
+      history.filter((h) => h.isCorrect).map((h) => h.questionId),
+    );
+    return history
+      .filter((h) => !h.isCorrect && !corrected.has(h.questionId))
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(0, Math.max(1, limit));
   }
 
   // ── Duplicate Option Detection ──────────────────────────────

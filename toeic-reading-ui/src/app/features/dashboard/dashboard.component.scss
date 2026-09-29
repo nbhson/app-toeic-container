@@ -245,6 +245,23 @@
   @include btn-theme(var(--purple), var(--purple-hover), rgba(139, 92, 246, 0.2));
 }
 
+.btn-gold {
+  @include btn-theme(var(--warning, #f59e0b), var(--warning, #f59e0b), rgba(245, 158, 11, 0.2));
+}
+
+.review-strip {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-left: 4px solid var(--warning, #f59e0b);
+}
+
+.review-line {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
 .progress-percentage {
   font-size: 0.85rem;
   font-weight: 700;

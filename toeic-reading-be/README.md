@@ -20,9 +20,21 @@ OMNIROUTE_MODEL=oc/deepseek-v4-flash-free
 OMNIROUTE_API_BASE_URL=http://localhost:20128/v1
 # Default API key (UI có thể override)
 OMNIROUTE_API_KEY=
+# Số lần retry khi model trả JSON sai schema (mặc định 3)
+OMNIROUTE_MAX_ATTEMPTS=3
+# Timeout gọi AI (ms)
+OMNIROUTE_TIMEOUT_MS=150000
 
 # Server Configuration
 PORT=3000
+# CORS: "*" cho dev local; production nên liệt kê domain, ví dụ:
+# FRONTEND_ORIGIN="https://toeic.example.com"
+FRONTEND_ORIGIN=*
+
+# Stats: số history entries tối đa giữ lại mỗi user (chống phình file JSON)
+MAX_HISTORY_SIZE=200
+# Question bank: số items tối đa mỗi part trong data/bank
+BANK_MAX_ITEMS=500
 ```
 
 ## 🚀 Khởi chạy
@@ -126,13 +138,24 @@ curl -X PUT http://localhost:3000/api/toeic/stats/user1 \
 curl -X DELETE http://localhost:3000/api/toeic/stats/user1
 ```
 
-### TOEIC Generation
+### TOEIC Generation (validate + retry + bank-first)
+
+Mọi response của AI đều được **validate schema** (`src/validation/toeic.validate.js`:
+đủ số lượng, blank `_______`/`[131]…` liên tục, 4 options duy nhất,
+`correctAnswer` 0–3, category/difficulty hợp lệ) và **retry tối đa
+`OMNIROUTE_MAX_ATTEMPTS` lần** trước khi báo lỗi — thay vì crash UI như trước.
+
+Các item vượt validation được **lưu vào question bank** (`data/bank/*.json`,
+tối đa `BANK_MAX_ITEMS` mỗi part, khử trùng lặp). Request kế tiếp phục vụ từ
+bank trước (nhanh, miễn phí), thiếu mới gọi AI bù. Response có thêm field
+`fromCache` (số item lấy từ bank). Truyền `"useCache": false` để ép sinh mới
+hoàn toàn bằng AI.
 
 | Method | Endpoint | Body | Mô tả |
 |--------|----------|------|-------|
-| `POST` | `/api/toeic/part5` | `{ count: number, apiKey?: string }` | Sinh câu hỏi Part 5 |
-| `POST` | `/api/toeic/part6` | `{ count: number, apiKey?: string }` | Sinh đoạn văn Part 6 |
-| `POST` | `/api/toeic/part7` | `{ passageType: 'Single'\|'Double'\|'Triple', count: number, startQuestionNumber: number, apiKey?: string }` | Sinh đoạn văn Part 7 |
+| `POST` | `/api/toeic/part5` | `{ count ≤ 30, apiKey?: string, useCache?: boolean }` | Sinh câu hỏi Part 5 |
+| `POST` | `/api/toeic/part6` | `{ count ≤ 4, apiKey?: string, useCache?: boolean }` | Sinh đoạn văn Part 6 (blank đánh số lại liên tục từ `[131]`) |
+| `POST` | `/api/toeic/part7` | `{ passageType, count ≤ 10, startQuestionNumber, apiKey?: string, useCache?: boolean }` | Sinh đoạn văn Part 7 (đánh số lại liên tục từ `startQuestionNumber`) |
 | `POST` | `/api/toeic/part7/batch` | `{ batches: Array, apiKey?: string }` | Sinh nhiều batch Part 7 trong 1 request |
 
 **Ví dụ:**
@@ -153,6 +176,41 @@ curl -X POST http://localhost:3000/api/toeic/part7 \
   -H "Content-Type: application/json" \
   -d '{"passageType": "Single", "count": 1, "startQuestionNumber": 147}'
 ```
+
+### Question Bank (luyện offline, không cần AI key)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| `GET` | `/api/toeic/bank` | Số item đã lưu theo từng part |
+| `GET` | `/api/toeic/bank/:part?limit=10` | Lấy ngẫu nhiên tối đa `limit` (1–100) item. `part` ∈ `part5, part6, part7-Single, part7-Double, part7-Triple` |
+| `DELETE` | `/api/toeic/bank/:part` | Xóa bank của 1 part |
+
+### Full Reading Test (100 câu / 75 phút / thang 5–495)
+
+Điểm là **ước lượng** (ETS thật quy đổi khác nhau theo từng form đề), nội suy
+tuyến tính giữa các mốc chuẩn và làm tròn tới bội số 5.
+
+| Method | Endpoint | Body | Mô tả |
+|--------|----------|------|-------|
+| `GET` | `/api/toeic/reading-test/config` | — | Cấu trúc đề chuẩn: `{ totalQuestions: 100, timeLimitMinutes: 75, parts: [...] }` |
+| `POST` | `/api/toeic/reading-test/score` | `{ correct: number, total?: number }` hoặc `{ answers: [{ selectedAnswer, correctAnswer }] }` | Chấm điểm → `{ correct, total, percent, score, level }` |
+
+```bash
+# Chấm 75/100 câu đúng
+curl -X POST http://localhost:3000/api/toeic/reading-test/score \
+  -H "Content-Type: application/json" \
+  -d '{"correct": 75, "total": 100}'
+# {"correct":75,"total":100,"percent":75,"score":375,"level":"Upper-Intermediate (355-400)",...}
+```
+
+### User Stats — Weak-point Analysis
+
+`PUT /stats/:userId` tự cắt `history` còn tối đa `MAX_HISTORY_SIZE` entries
+mới nhất (chống phình file JSON).
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| `GET` | `/api/toeic/stats/:userId/analysis` | Phân tích điểm yếu: `overall`, `byCategory` (accuracy từng nhóm), `weakest` (tối đa 3 nhóm đã làm ≥ 3 câu, accuracy thấp nhất), `recentWrong` (10 câu sai gần nhất để ôn lại) |
 
 ### Health Check
 
@@ -178,32 +236,49 @@ Khi gọi TOEIC generation endpoints, API key được resolve theo thứ tự �
 ```
 toeic-reading-be/
 ├── src/
-│   ├── server.js                  # Express server entry point
+│   ├── server.js                  # Express server entry point (CORS, limits, security headers)
 │   ├── routes/
-│   │   ├── toeic.routes.js        # TOEIC generation API routes
+│   │   ├── toeic.routes.js        # TOEIC generation API routes (bank-first + caps)
+│   │   ├── bank.routes.js         # Question bank API routes
+│   │   ├── reading-test.routes.js # Full-test config + scoring routes
 │   │   ├── keys.routes.js         # API key management routes
-│   │   ├── stats.routes.js        # User stats routes
+│   │   ├── stats.routes.js        # User stats + analysis routes
 │   │   └── __tests__/
 │   │       ├── keys.routes.test.js
-│   │       ├── stats.routes.test.js
+│   │       ├── bank.routes.test.js
+│   │       ├── reading-test.routes.test.js
 │   │       └── toeic.routes.test.js
 │   ├── services/
-│   │   ├── omniroute.service.js   # OmniRoute API client + safeParseJSON
+│   │   ├── omniroute.service.js   # OmniRoute client + safeParseJSON + validate/retry/bank
 │   │   └── __tests__/
 │   │       └── omniroute.service.test.js
+│   ├── validation/
+│   │   ├── toeic.validate.js      # Schema validators cho output AI (Part 5/6/7)
+│   │   └── __tests__/
+│   │       └── toeic.validate.test.js
+│   ├── utils/
+│   │   ├── score-table.js         # Quy đổi điểm Reading 5–495 + READING_TEST_CONFIG
+│   │   └── __tests__/
+│   │       └── score-table.test.js
 │   ├── prompts/
 │   │   ├── toeic.prompts.js       # Prompt templates
 │   │   └── __tests__/
 │   │       └── toeic.prompts.test.js
 │   └── db/
 │       ├── key-store.js           # JSON file-based key store
-│       ├── stats-store.js         # Per-user stats store
+│       ├── stats-store.js         # Per-user stats store (history cap + analyzeStats)
+│       ├── bank-store.js          # Question bank store (dedupe + cap + sample)
 │       └── __tests__/
 │           ├── key-store.test.js
-│           └── stats-store.test.js
-├── data/                           # Runtime data (gitignored)
+│           ├── stats-store.test.js
+│           ├── stats-analysis.test.js
+│           └── bank-store.test.js
+├── data/                           # Runtime data (gitignored, mount volume trong Docker)
 │   ├── keys.json                   # Stored API keys
-│   └── stats/                      # Per-user stats (e.g., user1.json)
+│   ├── stats/                      # Per-user stats (e.g., user1.json)
+│   └── bank/                       # Question bank (part5.json, part6.json, part7-*.json)
+├── Dockerfile                      # Non-root user + HEALTHCHECK /api/health
+├── .env.example                    # Mẫu biến môi trường
 ├── vitest.config.js
 ├── package.json
 └── .env                            # Environment variables (gitignored)
@@ -217,16 +292,20 @@ Dự án sử dụng **Vitest** cho unit testing với **supertest** cho HTTP ro
 
 ### Test Coverage
 
-| Module | Tests | Mô tả |
-|--------|-------|-------|
-| `key-store.js` | 14 | CRUD operations, persistence, masking, directory creation |
-| `stats-store.js` | 11 | Per-user CRUD, path traversal protection, persistence |
-| `keys.routes.js` | 8 | GET/PUT/DELETE endpoints, validation, error handling |
-| `stats.routes.js` | 8 | GET/PUT/DELETE endpoints, validation, default stats |
-| `toeic.routes.js` | 19 | Part 5/6/7/batch generation, key resolution, validation, error handling |
-| `toeic.prompts.js` | 14 | Prompt template generation for all parts |
-| `omniroute.service.js` | 14 | `safeParseJSON` sanitization for AI-generated JSON |
-| **Total** | **80** | |
+| Module | Mô tả |
+|--------|-------|
+| `key-store.js` | CRUD operations, persistence, masking, directory creation |
+| `stats-store.js` | Per-user CRUD, path traversal protection, persistence |
+| `stats-analysis` | History cap (`MAX_HISTORY_SIZE`), `analyzeStats` (weakest, recentWrong) |
+| `bank-store.js` | Bank CRUD, dedupe, cap, random sample, clear |
+| `toeic.validate.js` | Validators Part 5/6/7: count, blanks, options, numbering |
+| `score-table.js` | Quy đổi 5–495 (đơn điệu, bội 5), scale partial totals, config 100 câu/75 phút |
+| `keys.routes.js` | GET/PUT/DELETE endpoints, validation, error handling |
+| `bank.routes.js` | Summary/sample/clear, limit clamp, unknown-part 400 |
+| `reading-test.routes.js` | Config + score (counts/answers), validation 400 |
+| `toeic.routes.js` | Part 5/6/7/batch generation, key resolution, caps, bank-first |
+| `toeic.prompts.js` | Prompt template generation for all parts |
+| `omniroute.service.js` | `safeParseJSON` sanitization for AI-generated JSON |
 
 ### Chạy tests
 

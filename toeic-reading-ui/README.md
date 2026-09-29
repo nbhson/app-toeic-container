@@ -98,11 +98,12 @@ Dự án được xây dựng và tối ưu trên nền tảng các công nghệ
 
 - **Cấu hình & Routers (`src/app/core/routers/`)**: Chứa tệp định tuyến chính `app.routes.ts`.
 - **Hệ thống Style (`src/app/core/styles/`)**: Nơi tập hợp tất cả các stylesheet partials phân rã và tệp điều phối chính `styles.scss`.
-- **Thư mục Features (`src/app/features/`)**: Chứa 4 trang chức năng độc lập tải trì hoãn (Lazy Loaded):
-  - `dashboard`: Tổng hợp dữ liệu thống kê phản xạ.
+- **Thư mục Features (`src/app/features/`)**: Chứa 5 trang chức năng độc lập tải trì hoãn (Lazy Loaded):
+  - `dashboard`: Tổng hợp dữ liệu thống kê phản xạ + dải điểm yếu/câu cần ôn lại.
   - `practice-part5`: Ôn luyện 30 câu hỏi trắc nghiệm đơn lẻ.
   - `practice-part6`: Ôn luyện các đoạn văn đọc điền từ với blank-anchors.
   - `practice-part7`: Ôn luyện đọc hiểu với Mini-Test và Full Mock Test.
+  - `reading-test`: Thi thử Reading chuẩn ETS — 100 câu, countdown 75 phút, tự nộp khi hết giờ, chấm điểm 5–495 qua BE, xem đáp án đúng/sai chi tiết.
 - **Singleton Service**: `ToeicService` đóng vai trò quản lý State tập trung bằng Signal. Thống kê lưu trên **Backend Server** (fallback localStorage khi BE offline).
 - **Multi-Provider AI Services**: Hỗ trợ đồng thời nhiều nhà cung cấp AI:
   - `GeminiService` — Gọi Google Gemini API (REST API trực tiếp từ UI).

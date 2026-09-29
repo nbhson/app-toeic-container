@@ -32,5 +32,13 @@ export const routes: Routes = [
       ),
     canDeactivate: [pendingChangesGuard],
   },
+  {
+    path: 'reading-test',
+    loadComponent: () =>
+      import('../../features/reading-test/reading-test.component').then(
+        (m) => m.ReadingTestComponent,
+      ),
+    canDeactivate: [pendingChangesGuard],
+  },
   { path: '**', redirectTo: EMPTY_STRING },
 ];

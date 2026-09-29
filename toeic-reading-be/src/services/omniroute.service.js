@@ -4,10 +4,14 @@
  */
 
 import { buildPart5Prompt, buildPart6Prompt, buildPart7Prompt } from '../prompts/toeic.prompts.js';
+import { validatePart5, validatePart6, validatePart7 } from '../validation/toeic.validate.js';
+import { bankStore } from '../db/bank-store.js';
 
 const OMNIROUTE_MODEL = process.env.OMNIROUTE_MODEL || 'oc/deepseek-v4-flash-free';
 const OMNIROUTE_API_BASE_URL = process.env.OMNIROUTE_API_BASE_URL || 'http://localhost:20128/v1';
 const REQUEST_TIMEOUT_MS = parseInt(process.env.OMNIROUTE_TIMEOUT_MS || '150000', 10); // 60s default
+// How many times to retry generation when the model returns malformed/invalid JSON.
+const GENERATION_MAX_ATTEMPTS = parseInt(process.env.OMNIROUTE_MAX_ATTEMPTS || '3', 10) || 3;
 
 /**
  * Attempts to parse a JSON string, with automatic sanitization and repair for
@@ -212,31 +216,65 @@ async function generateContent(prompt, apiKey) {
 }
 
 /**
- * Generates TOEIC Part 5 questions.
+ * Archives validated items to the local question bank (best-effort, never throws).
+ * Lets repeat sessions be served from the bank instead of always calling the AI.
+ */
+function saveToBank(part, items) {
+  try {
+    if (Array.isArray(items) && items.length > 0) bankStore.addItems(part, items);
+  } catch (err) {
+    console.warn(`[bank] Could not archive ${part} items:`, err.message);
+  }
+}
+
+/**
+ * Generates TOEIC Part 5 questions (validated, retried, bank-archived).
  * @param {number} count
  * @param {string} apiKey
  * @returns {Promise<Array>}
  */
 export async function generateToeicQuestions(count, apiKey) {
   const prompt = buildPart5Prompt(count);
-  const result = await generateContent(prompt, apiKey);
-  return result.questions;
+  let lastError;
+  for (let attempt = 1; attempt <= GENERATION_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateContent(prompt, apiKey);
+      validatePart5(result, count);
+      saveToBank('part5', result.questions);
+      return result.questions;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Part5] Attempt ${attempt}/${GENERATION_MAX_ATTEMPTS} failed:`, err.message);
+    }
+  }
+  throw new Error(`Part 5 generation failed after ${GENERATION_MAX_ATTEMPTS} attempts. Last error: ${lastError?.message}`);
 }
 
 /**
- * Generates TOEIC Part 6 passages.
+ * Generates TOEIC Part 6 passages (validated, retried, bank-archived).
  * @param {number} count
  * @param {string} apiKey
  * @returns {Promise<Array>}
  */
 export async function generateToeicPart6Passages(count, apiKey) {
   const prompt = buildPart6Prompt(count);
-  const result = await generateContent(prompt, apiKey);
-  return result.passages;
+  let lastError;
+  for (let attempt = 1; attempt <= GENERATION_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateContent(prompt, apiKey);
+      validatePart6(result, count);
+      saveToBank('part6', result.passages);
+      return result.passages;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Part6] Attempt ${attempt}/${GENERATION_MAX_ATTEMPTS} failed:`, err.message);
+    }
+  }
+  throw new Error(`Part 6 generation failed after ${GENERATION_MAX_ATTEMPTS} attempts. Last error: ${lastError?.message}`);
 }
 
 /**
- * Generates TOEIC Part 7 passages.
+ * Generates TOEIC Part 7 passages (validated, retried, bank-archived).
  * @param {string} passageType - 'Single' | 'Double' | 'Triple'
  * @param {number} count
  * @param {number} startQuestionNumber
@@ -245,6 +283,17 @@ export async function generateToeicPart6Passages(count, apiKey) {
  */
 export async function generateToeicPart7Passages(passageType, count, startQuestionNumber, apiKey) {
   const prompt = buildPart7Prompt(passageType, count, startQuestionNumber);
-  const result = await generateContent(prompt, apiKey);
-  return result.passages;
+  let lastError;
+  for (let attempt = 1; attempt <= GENERATION_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await generateContent(prompt, apiKey);
+      validatePart7(result, passageType, count, startQuestionNumber);
+      saveToBank(`part7-${passageType}`, result.passages);
+      return result.passages;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Part7] Attempt ${attempt}/${GENERATION_MAX_ATTEMPTS} failed:`, err.message);
+    }
+  }
+  throw new Error(`Part 7 generation failed after ${GENERATION_MAX_ATTEMPTS} attempts. Last error: ${lastError?.message}`);
 }

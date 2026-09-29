@@ -93,8 +93,17 @@ services:
       - "3000:3000"
     env_file:
       - ./toeic-reading-be/.env
+    volumes:
+      # Persist keys + user stats + question bank across rebuilds.
+      - ./toeic-reading-be/data:/app/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   frontend:
     build: ./toeic-reading-ui
@@ -102,7 +111,14 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 ```
 
 ### Flow kết nối
@@ -122,12 +138,19 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 COPY src ./src
+RUN mkdir -p /app/data && chown -R node:node /app
+# Run as non-root for least privilege.
+USER node
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "src/server.js"]
 ```
 
 - Sử dụng `npm ci --omit=dev` để chỉ cài production dependencies
-- Copy source code và chạy trực tiếp `node src/server.js`
+- Chạy bằng user `node` (non-root), HEALTHCHECK vào `/api/health`
+- Runtime data (`keys.json`, stats, question bank) nằm ở `/app/data` —
+  mount volume `./toeic-reading-be/data:/app/data` để không mất khi rebuild
 
 ## Dockerfile - Frontend
 
@@ -280,10 +303,42 @@ Lệnh này tự động thực hiện tất cả các bước:
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/api/health` | Health check |
-| — | `/api/toeic/*` | TOEIC routes |
+| GET | `/api/health` | Health check (dùng cho Docker HEALTHCHECK) |
+| POST | `/api/toeic/part5` | Sinh câu hỏi Part 5 (bank-first, `useCache`, tối đa 30) |
+| POST | `/api/toeic/part6` | Sinh đoạn văn Part 6 (tối đa 4) |
+| POST | `/api/toeic/part7` | Sinh đoạn văn Part 7 Single/Double/Triple |
+| POST | `/api/toeic/part7/batch` | Sinh nhiều batch Part 7 trong 1 request |
+| GET | `/api/toeic/bank` | Số item trong question bank theo part |
+| GET | `/api/toeic/bank/:part?limit=` | Lấy item từ bank để luyện offline |
+| DELETE | `/api/toeic/bank/:part` | Xóa bank của 1 part |
+| GET | `/api/toeic/reading-test/config` | Cấu trúc đề Full Test (100 câu / 75 phút) |
+| POST | `/api/toeic/reading-test/score` | Chấm điểm thang 5–495 (ước lượng) |
+| GET | `/api/toeic/stats/:userId/analysis` | Phân tích điểm yếu + 10 câu sai gần nhất |
 | — | `/api/toeic/keys/*` | Keys routes |
 | — | `/api/toeic/stats/*` | Stats routes |
+
+## Tính năng chính
+
+- **Thi thử Reading chuẩn ETS**: route `/reading-test` trên UI — 100 câu
+  (Part 5: 30 · Part 6: 16 · Part 7: ~54), countdown 75 phút, tự nộp khi hết
+  giờ, chấm điểm 5–495 + xem đáp án đúng/sai chi tiết.
+- **Question bank**: item AI đã validate được lưu vào `data/bank/`, phiên sau
+  phục vụ từ bank trước (nhanh, không tốn AI call); API `/bank` cho phép luyện
+  offline và `useCache: false` để ép sinh mới.
+- **Validate + retry AI output**: sai schema (thiếu câu, trùng options, sai
+  đánh số blank) thì tự retry tối đa 3 lần (`OMNIROUTE_MAX_ATTEMPTS`).
+- **Phân tích điểm yếu**: dashboard hiển thị nhóm yếu nhất + số câu sai chưa
+  sửa (spaced repetition cơ bản); API `/stats/:userId/analysis`.
+- **Vận hành**: BE chạy non-root + HEALTHCHECK, `data/` mount volume chống mất
+  dữ liệu, CORS giới hạn theo `FRONTEND_ORIGIN`, giới hạn body 1mb, headers
+  bảo mật cơ bản, CI chạy test BE + build FE.
+
+## CI
+
+Workflow `.github/workflows/ci.yml` chạy trên mỗi push/PR vào `main`:
+
+- `backend`: `npm ci` + `npm run test:be` (vitest, 124 tests).
+- `frontend`: `npm ci` + `npm run build:ui` (`ng build`).
 
 ## Phát triển local (không dùng Docker)
 

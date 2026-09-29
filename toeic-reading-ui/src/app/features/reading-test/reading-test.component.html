@@ -1,0 +1,138 @@
+<div class="rt-container animate-fade">
+  @if (phase() === 'setup') {
+    <div class="glass-card rt-card animate-slide-up">
+      <h1 class="page-title">Thi thử Reading — đề chuẩn ETS</h1>
+      <p class="page-subtitle">100 câu (Part 5: 30 · Part 6: 16 · Part 7: 54) · {{ timeLimitMinutes() }} phút · Thang điểm 5–495</p>
+      <ul class="rt-rules">
+        <li>Hết giờ bài tự động nộp; câu bỏ trống tính là sai.</li>
+        <li>Kết quả gồm điểm ước lượng, trình độ và đáp án chi tiết để ôn lại.</li>
+        <li>Cần cấu hình API Key (OmniRoute/Gemini) trong phần cài đặt trước khi bắt đầu.</li>
+      </ul>
+      @if (errorMessage()) {
+        <p class="rt-error">{{ errorMessage() }}</p>
+      }
+      <div class="rt-actions">
+        <button class="btn-primary" (click)="start()">Bắt đầu làm bài</button>
+        <button class="btn-secondary" (click)="openSettings()">Cài đặt API Key</button>
+      </div>
+    </div>
+  }
+
+  @if (phase() === 'loading') {
+    <div class="glass-card rt-card">
+      <h1 class="page-title">Đang tạo đề thi…</h1>
+      <p class="page-subtitle">Hệ thống ưu tiên dùng ngân hàng câu hỏi có sẵn để vào bài nhanh, thiếu mới gọi AI.</p>
+      <p class="rt-loading">Vui lòng chờ trong giây lát.</p>
+    </div>
+  }
+
+  @if (phase() === 'testing' || phase() === 'result') {
+    <div class="rt-timerbar">
+      <span class="rt-timer" [class.rt-timer-danger]="remainingSeconds() < 300">{{ timeDisplay() }}</span>
+      <span class="rt-progress">Đã làm {{ answeredCount() }}/{{ totalQuestions() }} câu</span>
+      @if (phase() === 'testing') {
+        <button class="btn-primary" (click)="submit()">Nộp bài</button>
+      } @else {
+        <button class="btn-secondary" (click)="restart()">Làm đề mới</button>
+      }
+    </div>
+
+    @if (score()) {
+      <div class="glass-card rt-card rt-result animate-pop">
+        <h1 class="page-title">Kết quả: {{ score()!.score }} / 495</h1>
+        <p class="page-subtitle">{{ score()!.level }} · Đúng {{ score()!.correct }}/{{ score()!.total }} ({{ score()!.percent }}%)</p>
+        @if (partScores()) {
+          <div class="rt-partscores">
+            <span>Part 5: {{ partScores()!.part5.correct }}/{{ partScores()!.part5.total }}</span>
+            <span>Part 6: {{ partScores()!.part6.correct }}/{{ partScores()!.part6.total }}</span>
+            <span>Part 7: {{ partScores()!.part7.correct }}/{{ partScores()!.part7.total }}</span>
+          </div>
+        }
+        <p class="rt-note">Điểm là ước lượng (thang ETS thật thay đổi theo từng form đề). Xem đáp án đúng/sai chi tiết bên dưới để ôn lại.</p>
+      </div>
+    }
+
+    <section class="rt-section">
+      <h2>Part 5 — Incomplete Sentences ({{ part5().length }} câu)</h2>
+      @for (q of part5(); track q.id; let i = $index) {
+        <div class="rt-q">
+          <p class="rt-stem"><strong>{{ 101 + i }}.</strong> {{ q.question }}</p>
+          <div class="rt-opts">
+            @for (opt of q.options; track $index; let oi = $index) {
+              <button
+                class="rt-opt"
+                [class.selected]="selected()[q.id] === oi"
+                [class.correct]="isSubmitted() && oi === q.correctAnswer"
+                [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
+                (click)="select(q.id, oi)"
+                [disabled]="isSubmitted()"
+              >{{ getOptionLetter(oi) }}. {{ opt }}</button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="rt-section">
+      <h2>Part 6 — Text Completion ({{ part6().length }} đoạn)</h2>
+      @for (p of part6(); track p.id) {
+        <div class="rt-passage">
+          <p class="rt-text">{{ p.text }}</p>
+          @for (q of p.questions; track q.id) {
+            <div class="rt-q">
+              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> Chọn đáp án đúng cho chỗ trống.</p>
+              <div class="rt-opts">
+                @for (opt of q.options; track $index; let oi = $index) {
+                  <button
+                    class="rt-opt"
+                    [class.selected]="selected()[q.id] === oi"
+                    [class.correct]="isSubmitted() && oi === q.correctAnswer"
+                    [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
+                    (click)="select(q.id, oi)"
+                    [disabled]="isSubmitted()"
+                  >{{ getOptionLetter(oi) }}. {{ opt }}</button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="rt-section">
+      <h2>Part 7 — Reading Comprehension ({{ part7().length }} cụm đoạn)</h2>
+      @for (p of part7(); track p.id) {
+        <div class="rt-passage">
+          <p class="rt-doc-type">{{ p.documentType }}</p>
+          <div class="rt-html" [innerHTML]="p.text"></div>
+          @for (q of p.questions; track q.id) {
+            <div class="rt-q">
+              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> {{ q.question }}</p>
+              <div class="rt-opts">
+                @for (opt of q.options; track $index; let oi = $index) {
+                  <button
+                    class="rt-opt"
+                    [class.selected]="selected()[q.id] === oi"
+                    [class.correct]="isSubmitted() && oi === q.correctAnswer"
+                    [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
+                    (click)="select(q.id, oi)"
+                    [disabled]="isSubmitted()"
+                  >{{ getOptionLetter(oi) }}. {{ opt }}</button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  @if (showConfirmLeaveModal()) {
+    <app-confirm-modal
+      title="Rời khỏi bài thi?"
+      message="Bài làm chưa nộp sẽ bị mất. Bạn có chắc muốn rời đi?"
+      (confirm)="onConfirmLeaveResponse(true)"
+      (cancel)="onConfirmLeaveResponse(false)"
+    />
+  }
+</div>

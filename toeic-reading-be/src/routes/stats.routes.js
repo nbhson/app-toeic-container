@@ -1,7 +1,28 @@
 import { Router } from 'express';
-import { getStats, saveStats, deleteStats } from '../db/stats-store.js';
+import { getStats, saveStats, deleteStats, analyzeStats } from '../db/stats-store.js';
 
 const router = Router();
+
+/**
+ * GET /api/toeic/stats/:userId/analysis
+ * Weak-point analysis: per-category accuracy, weakest categories (>=3 answered),
+ * and 10 most recent wrong answers (for review / spaced repetition).
+ * NOTE: registered before "/:userId" for clarity (Express matches single-segment
+ * params only, but explicit ordering avoids surprises).
+ */
+router.get('/:userId/analysis', (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'userId is required and must be a string.' });
+    }
+    const stats = getStats(userId);
+    res.json({ userId, ...analyzeStats(stats) });
+  } catch (error) {
+    console.error('Error analyzing stats:', error.message);
+    res.status(500).json({ error: error.message || 'Internal server error.' });
+  }
+});
 
 /**
  * GET /api/toeic/stats/:userId

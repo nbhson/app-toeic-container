@@ -44,6 +44,8 @@ export const OMNIROUTE_CONFIG = {
 export const BE_API_URL = 'http://localhost:3000/api/toeic';
 export const BE_KEYS_URL = 'http://localhost:3000/api/toeic/keys';
 export const BE_STATS_URL = 'http://localhost:3000/api/toeic/stats';
+export const BE_BANK_URL = 'http://localhost:3000/api/toeic/bank';
+export const BE_READING_TEST_URL = 'http://localhost:3000/api/toeic/reading-test';
 
 /**
  * Generates or retrieves a persistent anonymous userId for stats tracking.

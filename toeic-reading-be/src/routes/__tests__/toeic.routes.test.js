@@ -45,7 +45,7 @@ describe('toeic.routes', () => {
 
       const res = await request(app)
         .post('/api/toeic/part5')
-        .send({ count: 5, apiKey: 'test-key' });
+        .send({ count: 5, apiKey: 'test-key', useCache: false });
 
       expect(res.status).toBe(200);
       expect(res.body.questions).toEqual(mockQuestions);
@@ -58,7 +58,7 @@ describe('toeic.routes', () => {
 
       const res = await request(app)
         .post('/api/toeic/part5')
-        .send({ count: 3 });
+        .send({ count: 3, useCache: false });
 
       expect(res.status).toBe(200);
       expect(generateToeicQuestions).toHaveBeenCalledWith(3, 'stored-key');
@@ -95,7 +95,7 @@ describe('toeic.routes', () => {
 
       const res = await request(app)
         .post('/api/toeic/part5')
-        .send({ count: 5, apiKey: 'test-key' });
+        .send({ count: 5, apiKey: 'test-key', useCache: false });
 
       expect(res.status).toBe(500);
       expect(res.body.error).toBe('API error');
@@ -109,7 +109,7 @@ describe('toeic.routes', () => {
 
       const res = await request(app)
         .post('/api/toeic/part6')
-        .send({ count: 2, apiKey: 'test-key' });
+        .send({ count: 2, apiKey: 'test-key', useCache: false });
 
       expect(res.status).toBe(200);
       expect(res.body.passages).toEqual(mockPassages);
@@ -137,6 +137,7 @@ describe('toeic.routes', () => {
           count: 1,
           startQuestionNumber: 147,
           apiKey: 'test-key',
+          useCache: false,
         });
 
       expect(res.status).toBe(200);

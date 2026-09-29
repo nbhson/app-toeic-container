@@ -65,6 +65,24 @@ export class DashboardComponent {
     return [...this.stats().history].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
   });
 
+  // Review queue: wrong answers never corrected since (spaced repetition, oldest first)
+  readonly reviewQueue = computed(() => this.toeicService.getReviewQueue(20));
+
+  // Weakest attempted category (min 3 answered) to guide study focus
+  readonly weakestCategory = computed(() => {
+    const stats = this.stats().categoryStats || {};
+    const attempted = Object.entries(stats).filter(
+      ([, v]: [string, any]) => (v?.answered || 0) >= 3,
+    );
+    if (attempted.length === 0) return null;
+    attempted.sort(
+      ([, a]: [string, any], [, b]: [string, any]) =>
+        a.correct / a.answered - b.correct / b.answered,
+    );
+    const [name, v] = attempted[0] as [string, any];
+    return { name, accuracy: Math.round((v.correct / v.answered) * 100), answered: v.answered };
+  });
+
   async resetData() {
     if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử luyện tập và kết quả thống kê không?')) {
       await this.toeicService.resetStats();
