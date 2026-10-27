@@ -34,12 +34,26 @@ app.use((_req, res, next) => {
   next();
 });
 
+// API key protection for key-management routes (/api/toeic/keys).
+// Set ADMIN_API_KEY env to require `X-API-Key: <ADMIN_API_KEY>` on these
+// routes. Unset = open (local dev only) — /keys can read masked values and
+// WRITE provider keys, so it must be protected in any shared deployment.
+function requireAdminKey(req, res, next) {
+  const expected = (process.env.ADMIN_API_KEY || '').trim();
+  if (!expected) return next(); // auth disabled in local dev
+  const presented = (req.headers['x-api-key'] || '').toString().trim();
+  if (presented !== expected) {
+    return res.status(401).json({ error: 'Unauthorized: missing or invalid X-API-Key.' });
+  }
+  next();
+}
+
 // Routes
 // NOTE: never log or echo req.body.apiKey — API keys must not leak into logs.
 app.use('/api/toeic/bank', bankRoutes);
 app.use('/api/toeic/reading-test', readingTestRoutes);
 app.use('/api/toeic', toeicRoutes);
-app.use('/api/toeic/keys', keysRoutes);
+app.use('/api/toeic/keys', requireAdminKey, keysRoutes);
 app.use('/api/toeic/stats', statsRoutes);
 
 // Health check

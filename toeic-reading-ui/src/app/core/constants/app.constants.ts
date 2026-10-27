@@ -37,15 +37,20 @@ export const GEMINI_CONFIG = {
 
 export const OMNIROUTE_CONFIG = {
   MODEL: 'oc/deepseek-v4-flash-free',
-  API_BASE_URL: 'http://localhost:20128/v1',
-  UI_STUDIO_URL: 'http://localhost:20128',
+  API_BASE_URL: (window as any).__env?.OMNIROUTE_API_URL || 'http://localhost:20128/v1',
+  UI_STUDIO_URL: (window as any).__env?.OMNIROUTE_STUDIO_URL || 'http://localhost:20128',
 } as const;
 
-export const BE_API_URL = 'http://localhost:3000/api/toeic';
-export const BE_KEYS_URL = 'http://localhost:3000/api/toeic/keys';
-export const BE_STATS_URL = 'http://localhost:3000/api/toeic/stats';
-export const BE_BANK_URL = 'http://localhost:3000/api/toeic/bank';
-export const BE_READING_TEST_URL = 'http://localhost:3000/api/toeic/reading-test';
+// Backend base URL is overridable at runtime via window.__env.BE_API_BASE_URL
+// (inject a small config script before the app bundle, e.g. per-deployment),
+// falling back to the local dev default.
+const BE_BASE_URL: string = (window as any).__env?.BE_API_BASE_URL || 'http://localhost:3000';
+
+export const BE_API_URL = `${BE_BASE_URL}/api/toeic`;
+export const BE_KEYS_URL = `${BE_BASE_URL}/api/toeic/keys`;
+export const BE_STATS_URL = `${BE_BASE_URL}/api/toeic/stats`;
+export const BE_BANK_URL = `${BE_BASE_URL}/api/toeic/bank`;
+export const BE_READING_TEST_URL = `${BE_BASE_URL}/api/toeic/reading-test`;
 
 /**
  * Generates or retrieves a persistent anonymous userId for stats tracking.
