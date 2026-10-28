@@ -11,7 +11,8 @@ router.get('/', (_req, res) => {
   try {
     res.json({ parts: BANK_PARTS, counts: bankStore.summary() });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    console.error('Error in bank route:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -30,7 +31,8 @@ router.get('/:part', (req, res) => {
     const items = bankStore.sample(part, limit);
     res.json({ part, requested: limit, returned: items.length, fromCache: items.length, items });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    console.error('Error in bank route:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -47,7 +49,8 @@ router.delete('/:part', (req, res) => {
     const removed = bankStore.clear(part);
     res.json({ success: true, part, removed });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    console.error('Error in bank route:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 

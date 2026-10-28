@@ -79,8 +79,8 @@ router.post('/part5', async (req, res) => {
     if (!apiKey) {
       return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
     }
-    if (!count || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive number.' });
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({ error: 'count must be a positive integer.' });
     }
     if (count > MAX_PART5_COUNT) {
       return res.status(400).json({ error: `count must not exceed ${MAX_PART5_COUNT} (official Part 5 size).` });
@@ -108,7 +108,7 @@ router.post('/part5', async (req, res) => {
     res.json({ questions, fromCache: cached.length });
   } catch (error) {
     console.error('Error generating Part 5 questions:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -126,8 +126,8 @@ router.post('/part6', async (req, res) => {
     if (!apiKey) {
       return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
     }
-    if (!count || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive number.' });
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({ error: 'count must be a positive integer.' });
     }
     if (count > MAX_PART6_COUNT) {
       return res.status(400).json({ error: `count must not exceed ${MAX_PART6_COUNT} (official Part 6 size).` });
@@ -157,7 +157,7 @@ router.post('/part6', async (req, res) => {
     res.json({ passages, fromCache: cached.length });
   } catch (error) {
     console.error('Error generating Part 6 passages:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -178,14 +178,14 @@ router.post('/part7', async (req, res) => {
     if (!passageType || !['Single', 'Double', 'Triple'].includes(passageType)) {
       return res.status(400).json({ error: 'passageType must be Single, Double, or Triple.' });
     }
-    if (!count || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive number.' });
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({ error: 'count must be a positive integer.' });
     }
     if (count > MAX_PART7_COUNT) {
       return res.status(400).json({ error: `count must not exceed ${MAX_PART7_COUNT} sets per request.` });
     }
-    if (startQuestionNumber === undefined || startQuestionNumber < 1) {
-      return res.status(400).json({ error: 'startQuestionNumber must be a positive number.' });
+    if (!Number.isInteger(startQuestionNumber) || startQuestionNumber < 1) {
+      return res.status(400).json({ error: 'startQuestionNumber must be a positive integer.' });
     }
 
     const start = Date.now();
@@ -212,7 +212,7 @@ router.post('/part7', async (req, res) => {
     res.json({ passages, fromCache: cached.length });
   } catch (error) {
     console.error('Error generating Part 7 passages:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -236,6 +236,11 @@ router.post('/part7/batch', async (req, res) => {
     if (!Array.isArray(batches) || batches.length === 0) {
       return res.status(400).json({ error: 'batches must be a non-empty array.' });
     }
+    // Cap số batch: mỗi batch gọi upstream AI — array khổng lồ trước đây
+    // biến endpoint này thành generation farm tùy ý.
+    if (batches.length > 20) {
+      return res.status(400).json({ error: 'batches must not exceed 20 items per request.' });
+    }
 
     const totalStart = Date.now();
     console.log(`[Part7-Batch] Processing ${batches.length} batches...`);
@@ -248,11 +253,11 @@ router.post('/part7/batch', async (req, res) => {
       if (!passageType || !['Single', 'Double', 'Triple'].includes(passageType)) {
         return res.status(400).json({ error: `Batch ${i}: passageType must be Single, Double, or Triple.` });
       }
-      if (!count || count < 1) {
-        return res.status(400).json({ error: `Batch ${i}: count must be a positive number.` });
+      if (!Number.isInteger(count) || count < 1) {
+        return res.status(400).json({ error: `Batch ${i}: count must be a positive integer.` });
       }
-      if (startQuestionNumber === undefined || startQuestionNumber < 1) {
-        return res.status(400).json({ error: `Batch ${i}: startQuestionNumber must be a positive number.` });
+      if (!Number.isInteger(startQuestionNumber) || startQuestionNumber < 1) {
+        return res.status(400).json({ error: `Batch ${i}: startQuestionNumber must be a positive integer.` });
       }
 
       const batchStart = Date.now();
@@ -268,7 +273,7 @@ router.post('/part7/batch', async (req, res) => {
     res.json({ passages: allPassages });
   } catch (error) {
     console.error('Error generating Part 7 batch:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 

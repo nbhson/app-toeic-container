@@ -114,10 +114,10 @@ describe('keys.routes', () => {
       expect(res.body.hasValue).toBe(false);
     });
 
-    it('succeeds even if key does not exist', async () => {
+    it('rejects a non-whitelisted key name', async () => {
       const res = await request(app).delete('/api/toeic/keys/nonexistent');
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('name must be one of');
     });
   });
 });

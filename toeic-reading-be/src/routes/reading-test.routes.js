@@ -35,7 +35,8 @@ router.post('/score', (req, res) => {
     }
     res.json({ ...result, scale: 'TOEIC Reading 5-495 (approximation, varies per official form)' });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    console.error('Error scoring reading test:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 

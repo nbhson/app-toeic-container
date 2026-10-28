@@ -79,7 +79,7 @@ describe('toeic.routes', () => {
         .send({ apiKey: 'test-key' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toContain('count must be a positive number');
+      expect(res.body.error).toContain('count must be a positive integer');
     });
 
     it('returns 400 when count is less than 1', async () => {
@@ -98,7 +98,7 @@ describe('toeic.routes', () => {
         .send({ count: 5, apiKey: 'test-key', useCache: false });
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toBe('API error');
+      expect(res.body.error).toBe('Internal server error.');
     });
   });
 
@@ -287,7 +287,7 @@ describe('toeic.routes', () => {
         });
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toContain('OmniRoute API error');
+      expect(res.body.error).toBe('Internal server error.');
     });
   });
 });

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import toeicRoutes from './routes/toeic.routes.js';
 import keysRoutes from './routes/keys.routes.js';
 import statsRoutes from './routes/stats.routes.js';
@@ -42,7 +43,9 @@ function requireAdminKey(req, res, next) {
   const expected = (process.env.ADMIN_API_KEY || '').trim();
   if (!expected) return next(); // auth disabled in local dev
   const presented = (req.headers['x-api-key'] || '').toString().trim();
-  if (presented !== expected) {
+  // Constant-time compare (HMAC wrapper cho khác độ dài) — tránh timing leak.
+  const mac = (s) => createHmac('sha256', 'admin-key').update(s).digest();
+  if (!presented || !timingSafeEqual(mac(presented), mac(expected))) {
     return res.status(401).json({ error: 'Unauthorized: missing or invalid X-API-Key.' });
   }
   next();
@@ -59,6 +62,22 @@ app.use('/api/toeic/stats', statsRoutes);
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 404 catch-all (route lạ trước đây rơi vào default handler HTML).
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found.' });
+});
+
+// JSON error handler cuối cùng: body-parse lỗi → 400; còn lại generic 500
+// (chi tiết lỗi chỉ vào log, KHÔNG trả client).
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  if (err?.type === 'entity.parse.failed' || err?.status === 400) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  console.error('Unhandled error:', err instanceof Error ? err.stack : err);
+  res.status(500).json({ error: 'Internal server error.' });
 });
 
 app.listen(PORT, () => {

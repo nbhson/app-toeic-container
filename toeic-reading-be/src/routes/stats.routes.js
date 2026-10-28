@@ -20,7 +20,7 @@ router.get('/:userId/analysis', (req, res) => {
     res.json({ userId, ...analyzeStats(stats) });
   } catch (error) {
     console.error('Error analyzing stats:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -62,7 +62,7 @@ router.get('/:userId', (req, res) => {
     res.json({ userId, stats });
   } catch (error) {
     console.error('Error getting stats:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -88,7 +88,7 @@ router.put('/:userId', (req, res) => {
     res.json({ success: true, userId });
   } catch (error) {
     console.error('Error saving stats:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
@@ -108,7 +108,7 @@ router.delete('/:userId', (req, res) => {
     res.json({ success: true, userId, deleted });
   } catch (error) {
     console.error('Error deleting stats:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
