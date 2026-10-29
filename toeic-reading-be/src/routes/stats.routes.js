@@ -1,7 +1,20 @@
 import { Router } from 'express';
-import { getStats, saveStats, deleteStats, analyzeStats } from '../db/stats-store.js';
+import { getStats, saveStats, deleteStats, analyzeStats, sanitizeStats } from '../db/stats-store.js';
 
 const router = Router();
+
+/**
+ * Shared :userId validation — applied once via router.param instead of being
+ * repeated in every handler.
+ */
+function validateUserIdParam(req, res, next) {
+  const { userId } = req.params;
+  if (!userId || typeof userId !== 'string') {
+    return res.status(400).json({ error: 'userId is required and must be a string.' });
+  }
+  next();
+}
+router.param('userId', validateUserIdParam);
 
 /**
  * GET /api/toeic/stats/:userId/analysis
@@ -13,9 +26,6 @@ const router = Router();
 router.get('/:userId/analysis', (req, res) => {
   try {
     const { userId } = req.params;
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'userId is required and must be a string.' });
-    }
     const stats = getStats(userId);
     res.json({ userId, ...analyzeStats(stats) });
   } catch (error) {
@@ -31,10 +41,6 @@ router.get('/:userId/analysis', (req, res) => {
 router.get('/:userId', (req, res) => {
   try {
     const { userId } = req.params;
-
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'userId is required and must be a string.' });
-    }
 
     const stats = getStats(userId);
     if (!stats) {
@@ -74,17 +80,23 @@ router.get('/:userId', (req, res) => {
 router.put('/:userId', (req, res) => {
   try {
     const { userId } = req.params;
-    const { stats } = req.body;
-
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'userId is required and must be a string.' });
-    }
+    const { stats } = req.body ?? {};
 
     if (!stats || typeof stats !== 'object') {
       return res.status(400).json({ error: 'stats is required and must be an object.' });
     }
 
-    saveStats(userId, stats);
+    // Validate + normalize before anything touches the store (R2-2): rejects
+    // negative/NaN/string numbers, malformed history entries and oversized
+    // payloads instead of persisting garbage.
+    let normalized;
+    try {
+      normalized = sanitizeStats(stats);
+    } catch (validationError) {
+      return res.status(400).json({ error: `Invalid stats: ${validationError.message}` });
+    }
+
+    saveStats(userId, normalized);
     res.json({ success: true, userId });
   } catch (error) {
     console.error('Error saving stats:', error.message);
@@ -99,10 +111,6 @@ router.put('/:userId', (req, res) => {
 router.delete('/:userId', (req, res) => {
   try {
     const { userId } = req.params;
-
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'userId is required and must be a string.' });
-    }
 
     const deleted = deleteStats(userId);
     res.json({ success: true, userId, deleted });
