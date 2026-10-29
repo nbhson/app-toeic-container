@@ -52,6 +52,7 @@ export const BE_KEYS_URL = `${BE_BASE_URL}/api/toeic/keys`;
 export const BE_STATS_URL = `${BE_BASE_URL}/api/toeic/stats`;
 export const BE_BANK_URL = `${BE_BASE_URL}/api/toeic/bank`;
 export const BE_READING_TEST_URL = `${BE_BASE_URL}/api/toeic/reading-test`;
+export const BE_NOTEBOOK_URL = `${BE_BASE_URL}/api/toeic/notebook`;
 
 /**
  * Generates or retrieves a persistent anonymous userId for stats tracking.

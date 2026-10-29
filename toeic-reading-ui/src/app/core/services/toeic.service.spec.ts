@@ -3,7 +3,7 @@ import { ToeicService } from './toeic.service';
 import { OmnirouteService } from './omniroute.service';
 import { UserStats, ToeicQuestion } from '../models/toeic.model';
 import { CATEGORIES, STORAGE_KEYS } from '../constants/app.constants';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('ToeicService', () => {
   let service: ToeicService;
@@ -550,6 +550,104 @@ describe('ToeicService', () => {
 
       service.showSettingsModal.set(false);
       expect(service.showSettingsModal()).toBe(false);
+    });
+  });
+
+  describe('notebook reviewed sync (BE + localStorage cache)', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('setNotebookReviewed writes localStorage immediately and PUTs to the BE', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+
+      service.setNotebookReviewed('q1', true);
+
+      // localStorage is the optimistic cache — written synchronously.
+      expect([...service.getNotebookReviewedIds()]).toEqual(['q1']);
+      // Fire-and-forget BE sync.
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(String(url)).toContain('/api/toeic/notebook/user-');
+      expect(init.method).toBe('PUT');
+      expect(JSON.parse(String(init.body)).reviewedIds).toEqual(['q1']);
+    });
+
+    it('unmarking removes the id locally and syncs the emptied list', async () => {
+      localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify(['q1', 'q2']));
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+
+      service.setNotebookReviewed('q1', false);
+      expect([...service.getNotebookReviewedIds()]).toEqual(['q2']);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).reviewedIds).toEqual(['q2']);
+    });
+
+    it('syncNotebookReviewed merges BE ids with the local cache and persists the merge', async () => {
+      localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify(['q-local']));
+      fetchMock
+        // GET /notebook/:userId
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ userId: 'u', reviewedIds: ['q-be'] }) })
+        // PUT /notebook/:userId
+        .mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+
+      const merged = await service.syncNotebookReviewed();
+      expect([...merged].sort()).toEqual(['q-be', 'q-local']);
+      expect(
+        JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTEBOOK_REVIEWED) as string).sort(),
+      ).toEqual(['q-be', 'q-local']);
+      const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(String(putCall![1].body)).reviewedIds.sort()).toEqual(['q-be', 'q-local']);
+    });
+
+    it('falls back to the local ids when the BE is unreachable', async () => {
+      localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify(['q-local']));
+      fetchMock.mockRejectedValue(new Error('BE down'));
+
+      const ids = await service.syncNotebookReviewed();
+      expect([...ids]).toEqual(['q-local']);
+    });
+  });
+
+  describe('getBaseQuestionId (notebook deep-links)', () => {
+    it('strips the session suffix appended by the loaders (Part 5 form)', () => {
+      expect(service.getBaseQuestionId('g-q1-1730000000000-ab12cd9-3')).toBe('g-q1');
+    });
+
+    it('strips the session suffix (Part 6/7 form: base-session-passage-question)', () => {
+      expect(service.getBaseQuestionId('p6-abc-1730000000000-ab12cd9-1-2')).toBe('p6-abc');
+    });
+
+    it('returns the input unchanged when there is no session suffix', () => {
+      expect(service.getBaseQuestionId('plain-id')).toBe('plain-id');
+    });
+
+    it('uses the tracked base id for questions loaded this session', async () => {
+      const mockQuestions: ToeicQuestion[] = [
+        {
+          id: 'g-q1',
+          question: 'Q1?',
+          options: ['A', 'B', 'C', 'D'],
+          correctAnswer: 0,
+          explanation: 'E1',
+          translation: 'T1',
+          category: 'Grammar',
+          difficulty: 'Easy',
+        },
+      ];
+      service.setApiKey('fake-key');
+      (omnirouteServiceMock.generateToeicQuestions as any).mockResolvedValue(mockQuestions);
+
+      const result = await service.loadPracticeQuestions(1);
+      expect(service.getBaseQuestionId(result[0].id)).toBe('g-q1');
     });
   });
 });

@@ -8,7 +8,7 @@ import {
   UserStats,
   TestResultSummary,
 } from '../models/toeic.model';
-import { STORAGE_KEYS, CATEGORIES, AIProvider, BE_STATS_URL, BE_BANK_URL, BE_READING_TEST_URL, getUserId } from '../constants/app.constants';
+import { STORAGE_KEYS, CATEGORIES, AIProvider, BE_STATS_URL, BE_BANK_URL, BE_READING_TEST_URL, BE_NOTEBOOK_URL, getUserId } from '../constants/app.constants';
 import { GeminiService } from './gemini.service';
 import { OmnirouteService } from './omniroute.service';
 
@@ -27,6 +27,14 @@ export class ToeicService {
     string,
     ToeicQuestion | ToeicPart6Question | ToeicPart7Question
   >();
+
+  /**
+   * Maps each session-unique question id (cache key above) back to the stable
+   * "base" id the AI/bank generated it with. Base ids survive across sessions
+   * when the question is served from the BE question bank, so they are what
+   * the notebook deep-links use to re-locate a question in a new session.
+   */
+  private readonly baseIdByUniqueId = new Map<string, string>();
 
   // Global state using Angular Signals
   readonly stats = signal<UserStats>(this.loadStats());
@@ -50,6 +58,29 @@ export class ToeicService {
    */
   getQuestionById(id: string): ToeicQuestion | ToeicPart6Question | ToeicPart7Question | undefined {
     return this.activeQuestionsMap.get(id);
+  }
+
+  /**
+   * Returns the stable base id behind a session-unique question id.
+   * The loaders mint unique ids as `${baseId}-${sessionId}-${idx}` (and
+   * `...-${passageIdx}-${questionIdx}` for Part 6/7), so for cached questions
+   * the mapping is looked up directly; for ids from an earlier session (e.g.
+   * notebook history after a reload) the appended session suffix is stripped
+   * heuristically. Returns the input unchanged when it has no suffix.
+   */
+  getBaseQuestionId(uniqueId: string): string {
+    if (!uniqueId) return uniqueId;
+    const mapped = this.baseIdByUniqueId.get(uniqueId);
+    if (mapped) return mapped;
+    const match = uniqueId.match(/^(.+)-\d{10,}-[a-z0-9]+(?:-\d+)*$/i);
+    return match ? match[1] : uniqueId;
+  }
+
+  /** Records the base id behind a session-unique id (called by the loaders). */
+  private trackBaseId(uniqueId: string, baseId: string) {
+    if (uniqueId && baseId && uniqueId !== baseId) {
+      this.baseIdByUniqueId.set(uniqueId, baseId);
+    }
   }
 
   /**
@@ -189,6 +220,7 @@ export class ToeicService {
         this.logDuplicateOptions('Part 5', uniqueQuestions);
         // Cache dynamic questions so they can be looked up when saving answers
         uniqueQuestions.forEach((q) => this.activeQuestionsMap.set(q.id, q));
+        uniqueQuestions.forEach((uq, idx) => this.trackBaseId(uq.id, aiQuestions[idx]?.id ?? ''));
         return uniqueQuestions;
       }
       throw new Error(`Không nhận được danh sách câu hỏi hợp lệ từ ${this.getActiveProviderName()} API.`);
@@ -238,8 +270,11 @@ export class ToeicService {
           this.logDuplicateOptions('Part 6', p.questions);
         }
         // Cache questions belonging to each passage
-        uniquePassages.forEach((p) => {
-          p.questions.forEach((q) => this.activeQuestionsMap.set(q.id, q));
+        uniquePassages.forEach((p, pIdx) => {
+          p.questions.forEach((q, qIdx) => {
+            this.activeQuestionsMap.set(q.id, q);
+            this.trackBaseId(q.id, passages[pIdx]?.questions[qIdx]?.id ?? '');
+          });
         });
         return uniquePassages;
       }
@@ -337,6 +372,12 @@ export class ToeicService {
               category,
             };
             this.activeQuestionsMap.set(q.id, cachedQuestion as any);
+          });
+        });
+        // Track base ids for notebook deep-links (see getBaseQuestionId).
+        uniquePassages.forEach((p, pIdx) => {
+          p.questions.forEach((q, qIdx) => {
+            this.trackBaseId(q.id, passages[pIdx]?.questions[qIdx]?.id ?? '');
           });
         });
 
@@ -715,6 +756,49 @@ export class ToeicService {
   // ── Wrong-answer notebook (localStorage-backed) ────────────
 
   /**
+   * Loads reviewed ids from the BE and merges them with the local cache.
+   * The BE is the source of truth when online; localStorage is the optimistic
+   * fallback. Returns the merged Set so callers can update their signals.
+   */
+  async syncNotebookReviewed(): Promise<Set<string>> {
+    const local = this.getNotebookReviewedIds();
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_NOTEBOOK_URL}/${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const beIds: string[] = Array.isArray(data.reviewedIds) ? data.reviewedIds : [];
+        // Merge: keep ids from both sources.
+        const merged = new Set([...local, ...beIds]);
+        // Persist merged state back to BE so it's always current.
+        await this.persistNotebookReviewed(merged);
+        // Also update localStorage as the offline cache.
+        localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify([...merged]));
+        return merged;
+      }
+    } catch (e) {
+      console.warn('Could not sync notebook reviewed from BE, using local:', e);
+    }
+    return local;
+  }
+
+  private async persistNotebookReviewed(ids: Set<string>): Promise<void> {
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_NOTEBOOK_URL}/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewedIds: [...ids] }),
+      });
+      if (!res.ok) {
+        console.warn('Could not persist notebook reviewed to BE:', res.status);
+      }
+    } catch (e) {
+      console.warn('Could not persist notebook reviewed to BE:', e);
+    }
+  }
+
+  /**
    * Question IDs marked as "đã ôn" in the notebook. Returns a fresh Set each
    * call so callers can mutate local copies safely.
    */
@@ -729,7 +813,7 @@ export class ToeicService {
     }
   }
 
-  /** Marks/unmarks a question as reviewed in the notebook. */
+  /** Marks/unmarks a question as reviewed in the notebook. Persists to BE. */
   setNotebookReviewed(questionId: string, reviewed: boolean) {
     if (typeof window === 'undefined') return;
     try {
@@ -740,6 +824,8 @@ export class ToeicService {
         ids.delete(questionId);
       }
       localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify([...ids]));
+      // Sync to BE (fire-and-forget; localStorage is the optimistic cache).
+      this.persistNotebookReviewed(ids);
     } catch (e) {
       console.error('Error saving notebook reviewed state', e);
     }

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, signal, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { ToeicService } from '../../core/services/toeic.service';
 import { UserStats } from '../../core/models/toeic.model';
@@ -27,7 +27,7 @@ interface NotebookItem {
   styleUrl: './notebook.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class NotebookComponent {
+export class NotebookComponent implements OnInit {
   private readonly toeicService = inject(ToeicService);
 
   readonly stats = this.toeicService.stats;
@@ -37,6 +37,14 @@ export class NotebookComponent {
 
   /** Show reviewed items too? */
   readonly showReviewed = signal<boolean>(false);
+
+  ngOnInit() {
+    // Sync reviewed ids from the BE (source of truth when online);
+    // localStorage stays the optimistic cache / offline fallback.
+    this.toeicService.syncNotebookReviewed().then((merged) => {
+      this.reviewedIds.set(merged);
+    });
+  }
 
   /** Latest attempt per question; keeps only wrong answers. */
   readonly items = computed<NotebookItem[]>(() => {
@@ -78,6 +86,15 @@ export class NotebookComponent {
 
   readonly pendingItems = computed(() => this.items().filter((i) => !i.reviewed));
   readonly reviewedCount = computed(() => this.items().filter((i) => i.reviewed).length);
+
+  /**
+   * Query params for the "Luyện Part X" deep-link: carries the stable base
+   * question id so the practice page can focus/scroll to the exact question
+   * when it is served again (e.g. from the BE question bank).
+   */
+  practiceQueryParams(item: NotebookItem): Record<string, string> {
+    return { questionId: this.toeicService.getBaseQuestionId(item.questionId) };
+  }
 
   getOptionLetter(index: number): string {
     return String.fromCharCode(65 + index);

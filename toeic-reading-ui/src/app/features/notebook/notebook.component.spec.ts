@@ -48,6 +48,8 @@ describe('NotebookComponent', () => {
       getNotebookReviewedIds,
       setNotebookReviewed,
       getQuestionById: questionById ?? vi.fn().mockReturnValue(undefined),
+      syncNotebookReviewed: vi.fn().mockResolvedValue(new Set(reviewedIds)),
+      getBaseQuestionId: vi.fn((id: string) => id),
     } as unknown as ToeicService;
 
     await TestBed.configureTestingModule({
@@ -135,5 +137,25 @@ describe('NotebookComponent', () => {
       id === 'q1' ? { id, correctAnswer: 1, explanation: 'Because of tense agreement.' } : undefined,
     );
     expect(component.items()[0].explanation).toBe('Because of tense agreement.');
+  });
+
+  it('syncs reviewed ids from the BE on init', async () => {
+    const merged = new Set(['be-1', 'q1']);
+    await setup([entry('q1', 'Wrong q1', 0, 1, false, 1000), entry('be-1', 'Wrong be-1', 0, 1, false, 2000)], ['q1']);
+    const service = (component as any).toeicService as any;
+    service.syncNotebookReviewed.mockResolvedValueOnce(merged);
+    await component.ngOnInit();
+    // The BE-merged set replaces the initial local one.
+    expect(component.reviewedCount()).toBe(2);
+  });
+
+  it('builds deep-link query params from the stable base question id', async () => {
+    await setup([entry('q1-session-1', 'Wrong q1', 0, 1, false, 1000)]);
+    // Mock strips the session suffix like the real getBaseQuestionId.
+    ((component as any).toeicService as any).getBaseQuestionId.mockImplementation(
+      (id: string) => id.split('-session')[0],
+    );
+    const params = component.practiceQueryParams(component.items()[0]);
+    expect(params['questionId']).toBe('q1');
   });
 });
