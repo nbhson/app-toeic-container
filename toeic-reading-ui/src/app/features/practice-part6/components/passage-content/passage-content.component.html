@@ -25,7 +25,7 @@
     </div>
 
     <div class="passage-actions">
-      <button (click)="toggleTranslation()" class="btn-translate-toggle">
+      <button (click)="toggleTranslation()" class="btn-translate-toggle" [attr.aria-pressed]="showTranslation()">
         {{ showTranslation() ? 'Ẩn dịch nghĩa đoạn văn' : 'Xem dịch nghĩa đoạn văn' }}
       </button>
     </div>

@@ -40,7 +40,8 @@
               [style.animation-delay]="i * 0.05 + 's'"
               [class.selected]="selectedOption() === i"
               [class.correct]="isSubmitted() && question().correctAnswer === i"
-              [class.incorrect]="isSubmitted() && selectedOption() === i && question().correctAnswer !== i">
+              [class.incorrect]="isSubmitted() && selectedOption() === i && question().correctAnswer !== i"
+              [attr.aria-pressed]="selectedOption() === i">
         <span class="option-letter" [class.selected-letter]="selectedOption() === i"
                                     [class.correct-letter]="isSubmitted() && question().correctAnswer === i"
                                     [class.incorrect-letter]="isSubmitted() && selectedOption() === i && question().correctAnswer !== i">
