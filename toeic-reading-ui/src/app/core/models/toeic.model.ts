@@ -60,3 +60,14 @@ export interface ToeicPart7Passage {
   translation: string;
   questions: ToeicPart7Question[];
 }
+
+/** One completed full Reading test, stored server-side (BE test-history). */
+export interface TestResultSummary {
+  takenAt: number;
+  score: number;
+  correct: number;
+  total: number;
+  percent: number;
+  level: string;
+  partScores?: { [part: string]: { correct: number; total: number } };
+}

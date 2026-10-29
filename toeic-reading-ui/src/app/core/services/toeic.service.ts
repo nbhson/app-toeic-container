@@ -6,6 +6,7 @@ import {
   ToeicPart7Question,
   ToeicPart7Passage,
   UserStats,
+  TestResultSummary,
 } from '../models/toeic.model';
 import { STORAGE_KEYS, CATEGORIES, AIProvider, BE_STATS_URL, BE_BANK_URL, BE_READING_TEST_URL, getUserId } from '../constants/app.constants';
 import { GeminiService } from './gemini.service';
@@ -191,10 +192,13 @@ export class ToeicService {
         return uniqueQuestions;
       }
       throw new Error(`Không nhận được danh sách câu hỏi hợp lệ từ ${this.getActiveProviderName()} API.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error generating questions from ${this.getActiveProviderName()} API:`, error);
+      // Preserve the specific error message from the provider/BE (e.g. quota,
+      // validation) — only fall back to the generic text when it is empty.
       throw new Error(
-        `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
+        error?.message?.trim() ||
+          `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
       );
     }
   }
@@ -240,10 +244,11 @@ export class ToeicService {
         return uniquePassages;
       }
       throw new Error(`Không nhận được danh sách đoạn văn hợp lệ từ ${this.getActiveProviderName()} API.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error generating Part 6 passages from ${this.getActiveProviderName()} API:`, error);
       throw new Error(
-        `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
+        error?.message?.trim() ||
+          `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
       );
     }
   }
@@ -338,10 +343,11 @@ export class ToeicService {
         return uniquePassages;
       }
       throw new Error(`Không nhận được danh sách đoạn văn Part 7 hợp lệ từ ${this.getActiveProviderName()} API.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error generating Part 7 passages from ${this.getActiveProviderName()} API:`, error);
       throw new Error(
-        `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
+        error?.message?.trim() ||
+          `Không thể kết nối hoặc gọi ${this.getActiveProviderName()} API. Vui lòng kiểm tra lại API Key hoặc kết nối mạng.`,
       );
     }
   }
@@ -654,6 +660,89 @@ export class ToeicService {
       .filter((h) => !h.isCorrect && !corrected.has(h.questionId))
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, Math.max(1, limit));
+  }
+
+  // ── Test history (server-side, powers the score trend) ─────
+
+  /**
+   * Loads the user's completed-test history from the BE (newest last).
+   * Returns [] when the BE is unreachable — the UI degrades gracefully.
+   */
+  async getTestHistory(): Promise<TestResultSummary[]> {
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_READING_TEST_URL}/history/${userId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.results) ? (data.results as TestResultSummary[]) : [];
+    } catch (e) {
+      console.warn('Could not load test history from BE:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Saves a completed test result to the BE history store.
+   * Returns the updated history, or null when the BE is unreachable.
+   */
+  async saveTestResult(entry: TestResultSummary): Promise<TestResultSummary[] | null> {
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_READING_TEST_URL}/history/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.results) ? (data.results as TestResultSummary[]) : [];
+    } catch (e) {
+      console.warn('Could not save test history to BE:', e);
+      return null;
+    }
+  }
+
+  /** Clears the server-side test history for this user. */
+  async clearTestHistory(): Promise<void> {
+    try {
+      const userId = getUserId();
+      await fetch(`${BE_READING_TEST_URL}/history/${userId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Could not clear test history on BE:', e);
+    }
+  }
+
+  // ── Wrong-answer notebook (localStorage-backed) ────────────
+
+  /**
+   * Question IDs marked as "đã ôn" in the notebook. Returns a fresh Set each
+   * call so callers can mutate local copies safely.
+   */
+  getNotebookReviewedIds(): Set<string> {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.NOTEBOOK_REVIEWED);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? new Set(parsed.filter((x) => typeof x === 'string')) : new Set();
+    } catch {
+      return new Set();
+    }
+  }
+
+  /** Marks/unmarks a question as reviewed in the notebook. */
+  setNotebookReviewed(questionId: string, reviewed: boolean) {
+    if (typeof window === 'undefined') return;
+    try {
+      const ids = this.getNotebookReviewedIds();
+      if (reviewed) {
+        ids.add(questionId);
+      } else {
+        ids.delete(questionId);
+      }
+      localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify([...ids]));
+    } catch (e) {
+      console.error('Error saving notebook reviewed state', e);
+    }
   }
 
   // ── Duplicate Option Detection ──────────────────────────────

@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   GEMINI_API_KEY: 'gemini_api_key',
   OMNIROUTE_API_KEY: 'omniroute_api_key',
   THEME: 'toeic_theme',
+  NOTEBOOK_REVIEWED: 'toeic_notebook_reviewed',
 } as const;
 
 export const THEME_MODES = {
