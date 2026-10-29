@@ -6,6 +6,7 @@ import {
 } from '../services/omniroute.service.js';
 import { getKey } from '../db/key-store.js';
 import { bankStore } from '../db/bank-store.js';
+import { generationRateLimit } from '../middleware/rate-limit.js';
 
 const router = Router();
 
@@ -13,6 +14,12 @@ const router = Router();
 const MAX_PART5_COUNT = 30;
 const MAX_PART6_COUNT = 4;
 const MAX_PART7_COUNT = 10;
+const MAX_BATCHES = 20;
+
+const PART7_TYPES = ['Single', 'Double', 'Triple'];
+
+const API_KEY_ERROR =
+  'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.';
 
 /** useCache defaults to true; pass false to force fresh AI generation. */
 function useBankCache(flag) {
@@ -46,23 +53,86 @@ const DEFAULT_API_KEY = process.env.OMNIROUTE_API_KEY || '';
  * 3. Default key from .env
  */
 function resolveApiKey(providedKey) {
-  // 1. Key provided directly in request
-  if (providedKey) {
-    return providedKey;
-  }
-
-  // 2. Key stored in BE key store
+  if (providedKey) return providedKey;
   const storedKey = getKey('omniroute');
-  if (storedKey) {
-    return storedKey;
-  }
-
-  // 3. Default key from .env
-  if (DEFAULT_API_KEY) {
-    return DEFAULT_API_KEY;
-  }
-
+  if (storedKey) return storedKey;
+  if (DEFAULT_API_KEY) return DEFAULT_API_KEY;
   return null;
+}
+
+/** Count validation shared by all generation endpoints. */
+function countValidationError(count, max, maxMessage) {
+  if (!Number.isInteger(count) || count < 1) {
+    return 'count must be a positive integer.';
+  }
+  if (count > max) {
+    return `count must not exceed ${max}${maxMessage}`;
+  }
+  return null;
+}
+
+function passageTypeValidationError(passageType, batchPrefix = '') {
+  if (!passageType || !PART7_TYPES.includes(passageType)) {
+    return `${batchPrefix}passageType must be Single, Double, or Triple.`;
+  }
+  return null;
+}
+
+function startQuestionValidationError(startQuestionNumber, batchPrefix = '') {
+  if (!Number.isInteger(startQuestionNumber) || startQuestionNumber < 1) {
+    return `${batchPrefix}startQuestionNumber must be a positive integer.`;
+  }
+  return null;
+}
+
+/**
+ * Shared generation pipeline used by part5/part6/part7:
+ * validate -> sample bank (unless useCache=false) -> AI-generate remainder ->
+ * optional post-process (renumbering) -> respond.
+ * Centralizes logging and the cache/generate merge so each route stays thin.
+ *
+ * @param {object} p
+ * @param {import('express').Response} p.res
+ * @param {string} p.part           bank part key, or '' to skip bank sampling
+ * @param {number} p.count
+ * @param {string} p.apiKey
+ * @param {string} p.logLabel       e.g. 'Part5'
+ * @param {string} p.responseKey    'questions' | 'passages'
+ * @param {(needed: number, cached: any[]) => Promise<any[]>} p.generate
+ * @param {(items: any[]) => any[]} [p.postProcess]
+ */
+async function handleGeneration({
+  res,
+  part,
+  count,
+  apiKey,
+  logLabel,
+  responseKey,
+  generate,
+  postProcess,
+}) {
+  const start = Date.now();
+  let cached = [];
+  if (part) {
+    try {
+      cached = bankStore.sample(part, count);
+    } catch {
+      cached = [];
+    }
+  }
+  const needed = count - cached.length;
+  let fresh = [];
+  if (needed > 0) {
+    console.log(`[${logLabel}] Generating ${needed}... (${cached.length} from bank)`);
+    fresh = await generate(needed, cached);
+  } else {
+    console.log(`[${logLabel}] Served ${count} from bank (no AI call)`);
+  }
+  const items = postProcess ? postProcess([...cached, ...fresh]) : [...cached, ...fresh];
+  console.log(
+    `[${logLabel}] Done in ${Date.now() - start}ms (${items.length} items, ${cached.length} cached)`,
+  );
+  res.json({ [responseKey]: items, fromCache: cached.length });
 }
 
 /**
@@ -71,41 +141,28 @@ function resolveApiKey(providedKey) {
  * Serves cached bank items first (fast + free), AI-generates the remainder.
  * Body: { count: number, apiKey?: string, useCache?: boolean }
  */
-router.post('/part5', async (req, res) => {
+router.post('/part5', generationRateLimit, async (req, res) => {
   try {
-    const { count, apiKey: providedKey, useCache } = req.body;
+    const { count, apiKey: providedKey, useCache } = req.body ?? {};
 
     const apiKey = resolveApiKey(providedKey);
     if (!apiKey) {
-      return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
+      return res.status(400).json({ error: API_KEY_ERROR });
     }
-    if (!Number.isInteger(count) || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive integer.' });
-    }
-    if (count > MAX_PART5_COUNT) {
-      return res.status(400).json({ error: `count must not exceed ${MAX_PART5_COUNT} (official Part 5 size).` });
+    const countError = countValidationError(count, MAX_PART5_COUNT, ' (official Part 5 size).');
+    if (countError) {
+      return res.status(400).json({ error: countError });
     }
 
-    const start = Date.now();
-    let cached = [];
-    if (useBankCache(useCache)) {
-      try {
-        cached = bankStore.sample('part5', count);
-      } catch {
-        cached = [];
-      }
-    }
-    const needed = count - cached.length;
-    let fresh = [];
-    if (needed > 0) {
-      console.log(`[Part5] Generating ${needed} questions... (${cached.length} from bank)`);
-      fresh = await generateToeicQuestions(needed, apiKey);
-    } else {
-      console.log(`[Part5] Served ${cached.length} questions from bank (no AI call)`);
-    }
-    const questions = [...cached, ...fresh];
-    console.log(`[Part5] Done in ${Date.now() - start}ms (${questions.length} questions, ${cached.length} cached)`);
-    res.json({ questions, fromCache: cached.length });
+    await handleGeneration({
+      res,
+      part: useBankCache(useCache) ? 'part5' : '',
+      count,
+      apiKey,
+      logLabel: 'Part5',
+      responseKey: 'questions',
+      generate: (needed) => generateToeicQuestions(needed, apiKey),
+    });
   } catch (error) {
     console.error('Error generating Part 5 questions:', error.message);
     res.status(500).json({ error: 'Internal server error.' });
@@ -118,43 +175,31 @@ router.post('/part5', async (req, res) => {
  * Serves cached bank items first (blanks renumbered sequentially from [131]).
  * Body: { count: number, apiKey?: string, useCache?: boolean }
  */
-router.post('/part6', async (req, res) => {
+router.post('/part6', generationRateLimit, async (req, res) => {
   try {
-    const { count, apiKey: providedKey, useCache } = req.body;
+    const { count, apiKey: providedKey, useCache } = req.body ?? {};
 
     const apiKey = resolveApiKey(providedKey);
     if (!apiKey) {
-      return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
+      return res.status(400).json({ error: API_KEY_ERROR });
     }
-    if (!Number.isInteger(count) || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive integer.' });
-    }
-    if (count > MAX_PART6_COUNT) {
-      return res.status(400).json({ error: `count must not exceed ${MAX_PART6_COUNT} (official Part 6 size).` });
+    const countError = countValidationError(count, MAX_PART6_COUNT, ' (official Part 6 size).');
+    if (countError) {
+      return res.status(400).json({ error: countError });
     }
 
-    const start = Date.now();
-    let cached = [];
-    if (useBankCache(useCache)) {
-      try {
-        cached = bankStore.sample('part6', count);
-      } catch {
-        cached = [];
-      }
-    }
-    const needed = count - cached.length;
-    let fresh = [];
-    if (needed > 0) {
-      console.log(`[Part6] Generating ${needed} passages... (${cached.length} from bank)`);
-      fresh = await generateToeicPart6Passages(needed, apiKey);
-    } else {
-      console.log(`[Part6] Served ${cached.length} passages from bank (no AI call)`);
-    }
-    // Renumber blanks sequentially across the combined set so cached + fresh
-    // passages never collide ([131]...).
-    const passages = renumberPart6Blanks([...cached, ...fresh]);
-    console.log(`[Part6] Done in ${Date.now() - start}ms (${passages.length} passages, ${cached.length} cached)`);
-    res.json({ passages, fromCache: cached.length });
+    await handleGeneration({
+      res,
+      part: useBankCache(useCache) ? 'part6' : '',
+      count,
+      apiKey,
+      logLabel: 'Part6',
+      responseKey: 'passages',
+      generate: (needed) => generateToeicPart6Passages(needed, apiKey),
+      // Renumber blanks sequentially across the combined set so cached + fresh
+      // passages never collide ([131]...).
+      postProcess: renumberPart6Blanks,
+    });
   } catch (error) {
     console.error('Error generating Part 6 passages:', error.message);
     res.status(500).json({ error: 'Internal server error.' });
@@ -167,49 +212,41 @@ router.post('/part6', async (req, res) => {
  * Serves cached bank items first (renumbered from startQuestionNumber).
  * Body: { passageType: 'Single'|'Double'|'Triple', count: number, startQuestionNumber: number, apiKey?: string, useCache?: boolean }
  */
-router.post('/part7', async (req, res) => {
+router.post('/part7', generationRateLimit, async (req, res) => {
   try {
-    const { passageType, count, startQuestionNumber, apiKey: providedKey, useCache } = req.body;
+    const { passageType, count, startQuestionNumber, apiKey: providedKey, useCache } = req.body ?? {};
 
     const apiKey = resolveApiKey(providedKey);
     if (!apiKey) {
-      return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
+      return res.status(400).json({ error: API_KEY_ERROR });
     }
-    if (!passageType || !['Single', 'Double', 'Triple'].includes(passageType)) {
-      return res.status(400).json({ error: 'passageType must be Single, Double, or Triple.' });
+    const typeError = passageTypeValidationError(passageType);
+    if (typeError) {
+      return res.status(400).json({ error: typeError });
     }
-    if (!Number.isInteger(count) || count < 1) {
-      return res.status(400).json({ error: 'count must be a positive integer.' });
+    const countError = countValidationError(count, MAX_PART7_COUNT, ' sets per request.');
+    if (countError) {
+      return res.status(400).json({ error: countError });
     }
-    if (count > MAX_PART7_COUNT) {
-      return res.status(400).json({ error: `count must not exceed ${MAX_PART7_COUNT} sets per request.` });
-    }
-    if (!Number.isInteger(startQuestionNumber) || startQuestionNumber < 1) {
-      return res.status(400).json({ error: 'startQuestionNumber must be a positive integer.' });
+    const startError = startQuestionValidationError(startQuestionNumber);
+    if (startError) {
+      return res.status(400).json({ error: startError });
     }
 
-    const start = Date.now();
-    let cached = [];
-    if (useBankCache(useCache)) {
-      try {
-        cached = bankStore.sample(`part7-${passageType}`, count);
-      } catch {
-        cached = [];
-      }
-    }
-    const needed = count - cached.length;
-    let fresh = [];
-    if (needed > 0) {
-      const freshStart = startQuestionNumber + cached.reduce((n, p) => n + p.questions.length, 0);
-      console.log(`[Part7] Generating ${needed} ${passageType} passages (Q${freshStart})... (${cached.length} from bank)`);
-      fresh = await generateToeicPart7Passages(passageType, needed, freshStart, apiKey);
-    } else {
-      console.log(`[Part7] Served ${cached.length} ${passageType} passages from bank (no AI call)`);
-    }
-    // Renumber across the combined set for a gapless sequence from startQuestionNumber.
-    const passages = renumberPart7Questions([...cached, ...fresh], startQuestionNumber);
-    console.log(`[Part7] Done in ${Date.now() - start}ms (${passages.length} passages, ${cached.length} cached)`);
-    res.json({ passages, fromCache: cached.length });
+    await handleGeneration({
+      res,
+      part: useBankCache(useCache) ? `part7-${passageType}` : '',
+      count,
+      apiKey,
+      logLabel: 'Part7',
+      responseKey: 'passages',
+      generate: (needed, cached) => {
+        const freshStart = startQuestionNumber + cached.reduce((n, p) => n + p.questions.length, 0);
+        return generateToeicPart7Passages(passageType, needed, freshStart, apiKey);
+      },
+      // Renumber across the combined set for a gapless sequence from startQuestionNumber.
+      postProcess: (items) => renumberPart7Questions(items, startQuestionNumber),
+    });
   } catch (error) {
     console.error('Error generating Part 7 passages:', error.message);
     res.status(500).json({ error: 'Internal server error.' });
@@ -225,21 +262,35 @@ router.post('/part7', async (req, res) => {
  *   apiKey?: string
  * }
  */
-router.post('/part7/batch', async (req, res) => {
+router.post('/part7/batch', generationRateLimit, async (req, res) => {
   try {
-    const { batches, apiKey: providedKey } = req.body;
+    const { batches, apiKey: providedKey } = req.body ?? {};
 
     const apiKey = resolveApiKey(providedKey);
     if (!apiKey) {
-      return res.status(400).json({ error: 'apiKey is required. Provide it in the request body or set OMNIROUTE_API_KEY in the server .env file.' });
+      return res.status(400).json({ error: API_KEY_ERROR });
     }
     if (!Array.isArray(batches) || batches.length === 0) {
       return res.status(400).json({ error: 'batches must be a non-empty array.' });
     }
     // Cap số batch: mỗi batch gọi upstream AI — array khổng lồ trước đây
     // biến endpoint này thành generation farm tùy ý.
-    if (batches.length > 20) {
-      return res.status(400).json({ error: 'batches must not exceed 20 items per request.' });
+    if (batches.length > MAX_BATCHES) {
+      return res.status(400).json({ error: `batches must not exceed ${MAX_BATCHES} items per request.` });
+    }
+
+    for (let i = 0; i < batches.length; i++) {
+      const { passageType, count, startQuestionNumber } = batches[i];
+      const prefix = `Batch ${i}: `;
+      const error =
+        passageTypeValidationError(passageType, prefix) ??
+        (Number.isInteger(count) && count >= 1
+          ? null
+          : `${prefix}count must be a positive integer.`) ??
+        startQuestionValidationError(startQuestionNumber, prefix);
+      if (error) {
+        return res.status(400).json({ error });
+      }
     }
 
     const totalStart = Date.now();
@@ -249,17 +300,6 @@ router.post('/part7/batch', async (req, res) => {
 
     for (let i = 0; i < batches.length; i++) {
       const { passageType, count, startQuestionNumber } = batches[i];
-
-      if (!passageType || !['Single', 'Double', 'Triple'].includes(passageType)) {
-        return res.status(400).json({ error: `Batch ${i}: passageType must be Single, Double, or Triple.` });
-      }
-      if (!Number.isInteger(count) || count < 1) {
-        return res.status(400).json({ error: `Batch ${i}: count must be a positive integer.` });
-      }
-      if (!Number.isInteger(startQuestionNumber) || startQuestionNumber < 1) {
-        return res.status(400).json({ error: `Batch ${i}: startQuestionNumber must be a positive integer.` });
-      }
-
       const batchStart = Date.now();
       console.log(`[Part7-Batch] Batch ${i + 1}/${batches.length}: ${count} ${passageType} (Q${startQuestionNumber})...`);
 

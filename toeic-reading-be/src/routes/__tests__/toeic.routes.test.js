@@ -20,6 +20,7 @@ const { generateToeicQuestions, generateToeicPart6Passages, generateToeicPart7Pa
 const { getKey } = await import('../../db/key-store.js');
 
 const toeicRoutes = (await import('../toeic.routes.js')).default;
+const { resetRateLimiter } = await import('../../middleware/rate-limit.js');
 
 function createTestApp() {
   const app = express();
@@ -36,6 +37,8 @@ describe('toeic.routes', () => {
     app = createTestApp();
     // Default: no stored key
     getKey.mockReturnValue(null);
+    // Keep the shared in-memory limiter from leaking counts between tests.
+    resetRateLimiter();
   });
 
   describe('POST /api/toeic/part5', () => {
