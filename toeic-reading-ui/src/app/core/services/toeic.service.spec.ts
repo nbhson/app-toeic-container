@@ -565,29 +565,50 @@ describe('ToeicService', () => {
       vi.unstubAllGlobals();
     });
 
-    it('setNotebookReviewed writes localStorage immediately and PUTs to the BE', async () => {
+    it('setNotebookReviewed writes localStorage immediately and PATCHes the single id to the BE', async () => {
       fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
 
       service.setNotebookReviewed('q1', true);
 
       // localStorage is the optimistic cache — written synchronously.
       expect([...service.getNotebookReviewedIds()]).toEqual(['q1']);
-      // Fire-and-forget BE sync.
+      // Fire-and-forget BE sync: per-id PATCH, not a full-list PUT.
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(String(url)).toContain('/api/toeic/notebook/user-');
-      expect(init.method).toBe('PUT');
-      expect(JSON.parse(String(init.body)).reviewedIds).toEqual(['q1']);
+      expect(init.method).toBe('PATCH');
+      const body = JSON.parse(String(init.body));
+      expect(body.questionId).toBe('q1');
+      expect(body.reviewed).toBe(true);
+      // Only one request per toggle — no full-list PUT.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it('unmarking removes the id locally and syncs the emptied list', async () => {
+    it('unmarking removes the id locally and PATCHes reviewed=false', async () => {
       localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify(['q1', 'q2']));
       fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
 
       service.setNotebookReviewed('q1', false);
       expect([...service.getNotebookReviewedIds()]).toEqual(['q2']);
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
-      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).reviewedIds).toEqual(['q2']);
+      expect(fetchMock.mock.calls[0][0]).toContain('/api/toeic/notebook/');
+      expect(fetchMock.mock.calls[0][1]?.method).toBe('PATCH');
+      const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+      expect(body.questionId).toBe('q1');
+      expect(body.reviewed).toBe(false);
+    });
+
+    it('does not fall back to PUT when the PATCH fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      fetchMock.mockRejectedValue(new Error('BE down'));
+      service.setNotebookReviewed('q1', true);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(fetchMock.mock.calls[0][1]?.method).toBe('PATCH');
+      // Wait for the fire-and-forget catch path so the rejection is fully
+      // handled before teardown.
+      await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled());
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      warnSpy.mockRestore();
     });
 
     it('syncNotebookReviewed merges BE ids with the local cache and persists the merge', async () => {

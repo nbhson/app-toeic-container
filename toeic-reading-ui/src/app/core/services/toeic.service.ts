@@ -799,6 +799,27 @@ export class ToeicService {
   }
 
   /**
+   * Single-toggle update on the BE (PATCH): adds/removes one id atomically.
+   * Used for per-toggle sync; the full-list PUT stays for the initial
+   * load merge in syncNotebookReviewed().
+   */
+  private async patchNotebookReviewed(questionId: string, reviewed: boolean): Promise<void> {
+    try {
+      const userId = getUserId();
+      const res = await fetch(`${BE_NOTEBOOK_URL}/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId, reviewed }),
+      });
+      if (!res.ok) {
+        console.warn('Could not patch notebook reviewed to BE:', res.status);
+      }
+    } catch (e) {
+      console.warn('Could not patch notebook reviewed to BE:', e);
+    }
+  }
+
+  /**
    * Question IDs marked as "đã ôn" in the notebook. Returns a fresh Set each
    * call so callers can mutate local copies safely.
    */
@@ -824,8 +845,9 @@ export class ToeicService {
         ids.delete(questionId);
       }
       localStorage.setItem(STORAGE_KEYS.NOTEBOOK_REVIEWED, JSON.stringify([...ids]));
-      // Sync to BE (fire-and-forget; localStorage is the optimistic cache).
-      this.persistNotebookReviewed(ids);
+      // Sync the single toggle to the BE (fire-and-forget; localStorage is
+      // the optimistic cache).
+      this.patchNotebookReviewed(questionId, reviewed);
     } catch (e) {
       console.error('Error saving notebook reviewed state', e);
     }
