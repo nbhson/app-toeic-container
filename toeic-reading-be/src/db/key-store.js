@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeJsonFileAtomic } from './atomic-write.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,7 +44,7 @@ export function createKeyStore(dataDir = DEFAULT_DATA_DIR) {
 
   function writeKeys(keys) {
     ensureDataDir();
-    writeFileSync(keysFile, JSON.stringify(keys, null, 2), 'utf-8');
+    writeJsonFileAtomic(keysFile, keys);
   }
 
   /**

@@ -9,6 +9,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeJsonFileAtomic } from './atomic-write.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -75,7 +76,7 @@ export function createBankStore(dataDir = DEFAULT_DATA_DIR, cap = DEFAULT_BANK_C
     }
     // Cap: keep the most recent items so the file never grows unbounded.
     const trimmed = existing.length > cap ? existing.slice(existing.length - cap) : existing;
-    writeFileSync(file, JSON.stringify(trimmed, null, 2), 'utf-8');
+    writeJsonFileAtomic(file, trimmed);
     return added;
   }
 
@@ -118,7 +119,7 @@ export function createBankStore(dataDir = DEFAULT_DATA_DIR, cap = DEFAULT_BANK_C
     const file = bankFile(dataDir, part);
     if (!existsSync(file)) return 0;
     const n = readItems(file).length;
-    writeFileSync(file, JSON.stringify([], null, 2), 'utf-8');
+    writeJsonFileAtomic(file, []);
     return n;
   }
 
