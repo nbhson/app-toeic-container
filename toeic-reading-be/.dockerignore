@@ -1,0 +1,10 @@
+# Keep the build context minimal; runtime data is provided by the
+# docker-compose bind mount (./toeic-reading-be/data:/app/data), never baked in.
+node_modules/
+data/
+.env
+.env.*.local
+coverage/
+.git/
+*.log
+.DS_Store

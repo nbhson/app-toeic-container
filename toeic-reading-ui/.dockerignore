@@ -1,0 +1,17 @@
+# Keep the build context minimal — .angular/ alone can be hundreds of MB.
+node_modules/
+dist/
+.angular/
+.git/
+.vscode/
+.github/
+coverage/
+.docker/
+.clineignore/
+.agents/
+
+# Local env & data never belong in the image
+.env
+.env.*.local
+*.log
+.DS_Store
