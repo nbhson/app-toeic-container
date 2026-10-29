@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { PracticePart7Component } from './practice-part7.component';
 import { ToeicService } from '../../core/services/toeic.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -32,6 +33,7 @@ describe('PracticePart7Component', () => {
       imports: [PracticePart7Component],
       providers: [
         { provide: ToeicService, useValue: toeicServiceMock },
+        provideRouter([]),
       ],
     }).compileComponents();
 

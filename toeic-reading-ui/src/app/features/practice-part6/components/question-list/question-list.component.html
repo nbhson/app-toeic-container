@@ -2,6 +2,7 @@
 <div class="questions-list-wrapper">
   @for (q of questions(); track q.id; let qIdx = $index) {
     <div class="glass-card question-card"
+         [id]="'q-card-' + q.questionNumber"
          [class.correct-border]="isSubmitted() && selectedAnswers()[q.id] === q.correctAnswer"
          [class.incorrect-border]="isSubmitted() && selectedAnswers()[q.id] !== q.correctAnswer">
 

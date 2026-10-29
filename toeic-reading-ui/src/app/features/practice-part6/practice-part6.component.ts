@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, computed, inject, signal, resource, effect, untracked, HostListener } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { ToeicService } from '../../core/services/toeic.service';
 import { ToeicPart6Passage } from '../../core/models/toeic.model';
 import { HasPendingChanges } from '../../core/guards/pending-changes.guard';
@@ -16,6 +17,15 @@ import { QuestionListComponent } from './components/question-list/question-list.
 })
 export class PracticePart6Component implements HasPendingChanges {
   private readonly toeicService = inject(ToeicService);
+  private readonly route = inject(ActivatedRoute);
+
+  /**
+   * Deep-link target from the notebook ("Luyện Part 6" on a wrong question):
+   * the stable base question id. When a loaded passage contains that question
+   * (typically served from the BE question bank), practice jumps to it and
+   * scrolls the question card into view.
+   */
+  private readonly focusQuestionId = this.route.snapshot.queryParamMap.get('questionId');
 
   showConfirmLeaveModal = signal<boolean>(false);
   private resolveLeave: ((value: boolean) => void) | null = null;
@@ -66,6 +76,43 @@ export class PracticePart6Component implements HasPendingChanges {
         this.showTranslation.set(false);
       });
     });
+
+    // Deep-link: once passages are loaded, jump to the requested question.
+    effect(() => {
+      const passages = this.passages();
+      if (passages.length > 0 && this.focusQuestionId) {
+        untracked(() => this.focusDeepLinkedQuestion());
+      }
+    });
+  }
+
+  /** True when a loaded question corresponds to the deep-linked notebook question. */
+  private matchesFocusId(questionId: string): boolean {
+    if (!this.focusQuestionId) return false;
+    return (
+      questionId === this.focusQuestionId ||
+      this.toeicService.getBaseQuestionId(questionId) === this.focusQuestionId
+    );
+  }
+
+  /**
+   * Jumps to the passage holding the deep-linked question and scrolls its
+   * question card into view (best-effort: no-op when the question is not part
+   * of the freshly loaded set).
+   */
+  private focusDeepLinkedQuestion() {
+    if (!this.focusQuestionId) return;
+    const passages = this.passages();
+    const passageIndex = passages.findIndex((p) =>
+      p.questions.some((q) => this.matchesFocusId(q.id)),
+    );
+    if (passageIndex < 0) return;
+    this.currentPassageIndex.set(passageIndex);
+    const question = passages[passageIndex].questions.find((q) => this.matchesFocusId(q.id));
+    if (question?.questionNumber !== undefined) {
+      // Wait a frame so the passage/question cards are rendered before scrolling.
+      setTimeout(() => this.scrollToQuestion(question.questionNumber), 300);
+    }
   }
 
   // Navigation handlers

@@ -4,6 +4,7 @@ import { ToeicService } from '../../core/services/toeic.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UserStats } from '../../core/models/toeic.model';
 import { signal } from '@angular/core';
+import { provideRouter } from '@angular/router';
 
 const createMockStats = (): UserStats => ({
   totalAnswered: 0,
@@ -32,6 +33,7 @@ describe('PracticePart5Component', () => {
       imports: [PracticePart5Component],
       providers: [
         { provide: ToeicService, useValue: toeicServiceMock },
+        provideRouter([]),
       ],
     }).compileComponents();
 

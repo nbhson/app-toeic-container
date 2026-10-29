@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ToeicService } from '../../core/services/toeic.service';
 import { ToeicPart7Passage } from '../../core/models/toeic.model';
+import { ActivatedRoute } from '@angular/router';
 import { HasPendingChanges } from '../../core/guards/pending-changes.guard';
 import { ConfirmModalComponent } from '../../shared/components/confirm-modal/confirm-modal.component';
 import { PassageContentComponent } from './components/passage-content/passage-content.component';
@@ -26,6 +27,15 @@ import { QuestionListComponent } from './components/question-list/question-list.
 })
 export class PracticePart7Component implements HasPendingChanges {
   private readonly toeicService = inject(ToeicService);
+  private readonly route = inject(ActivatedRoute);
+
+  /**
+   * Deep-link target from the notebook ("Luyện Part 7" on a wrong question):
+   * the stable base question id. Because Part 7 practice starts on a mode
+   * selection screen, a deep link auto-selects the mini-test; when the loaded
+   * passages contain the question, practice jumps to it and scrolls it into view.
+   */
+  private readonly focusQuestionId = this.route.snapshot.queryParamMap.get('questionId');
 
   // Leave confirmation modal states
   showConfirmLeaveModal = signal<boolean>(false);
@@ -71,11 +81,66 @@ export class PracticePart7Component implements HasPendingChanges {
     this.toeicService.showSettingsModal.set(true);
   }
 
+  constructor() {
+    // Notebook deep-link: "Luyện Part 7" on a wrong question skips the mode
+    // selection screen (mini-test) and focuses the question once loaded.
+    if (this.focusQuestionId) {
+      this.practiceMode.set('mini');
+    }
+    effect(() => {
+      const passages = this.passages();
+      if (passages.length > 0 && this.practiceMode() !== null && this.focusQuestionId) {
+        untracked(() => this.focusDeepLinkedQuestion());
+      }
+    });
+  }
+
   selectMode(mode: 'mini' | 'full') {
     this.practiceMode.set(mode);
     this.currentPassageIndex.set(0);
     this.selectedAnswers.set({});
     this.isSubmitted.set({});
+  }
+
+  /** True when a loaded question matches the deep-linked notebook question id. */
+  private matchesFocusId(questionId: string): boolean {
+    if (!this.focusQuestionId) return false;
+    return (
+      questionId === this.focusQuestionId ||
+      this.toeicService.getBaseQuestionId(questionId) === this.focusQuestionId
+    );
+  }
+
+  /**
+   * Finds the passage+question for the deep-linked question id, navigates to
+   * that passage, and scrolls the question card into view.
+   */
+  private focusDeepLinkedQuestion() {
+    if (!this.focusQuestionId) return;
+    const passages = this.passages();
+    const passageIndex = passages.findIndex((p) =>
+      p.questions.some((q) => this.matchesFocusId(q.id)),
+    );
+    if (passageIndex < 0) return;
+    this.currentPassageIndex.set(passageIndex);
+    const question = passages[passageIndex].questions.find((q) => this.matchesFocusId(q.id));
+    if (question?.questionNumber !== undefined) {
+      setTimeout(() => this.scrollToQuestion(question.questionNumber), 300);
+    }
+  }
+
+  /**
+   * Scrolls the identified question card into view with a highlight flash.
+   * Works because both practice-part7 and practice-part6 question-list
+   * templates render `[id]="'q-card-' + q.questionNumber"` on each card.
+   */
+  scrollToQuestion(gapNumber: number) {
+    const cardElement = document.getElementById(`q-card-${gapNumber}`);
+    if (cardElement) {
+      cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      cardElement.classList.add('highlight-flash');
+      setTimeout(() => cardElement.classList.remove('highlight-flash'), 1500);
+    }
   }
 
   resetSession() {

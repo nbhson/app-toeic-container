@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, computed, inject, signal, resource, effect, untracked, HostListener } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { ToeicService } from '../../core/services/toeic.service';
 import { ToeicQuestion } from '../../core/models/toeic.model';
 import { QuestionCardComponent } from './components/question-card/question-card.component';
@@ -15,6 +16,15 @@ import { ConfirmModalComponent } from '../../shared/components/confirm-modal/con
 })
 export class PracticePart5Component implements HasPendingChanges {
   private readonly toeicService = inject(ToeicService);
+  private readonly route = inject(ActivatedRoute);
+
+  /**
+   * Deep-link target from the notebook ("Luyện Part 5" on a wrong question):
+   * the stable base question id. When the question is part of the freshly
+   * loaded set (typically served from the BE question bank), practice starts
+   * on it instead of question 1.
+   */
+  private readonly focusQuestionId = this.route.snapshot.queryParamMap.get('questionId');
 
   showConfirmLeaveModal = signal<boolean>(false);
   private resolveLeave: ((value: boolean) => void) | null = null;
@@ -58,11 +68,28 @@ export class PracticePart5Component implements HasPendingChanges {
       const q = this.questionsResource.value();
       if (q && q.length > 0) {
         untracked(() => {
-          this.currentIndex.set(0);
+          // Deep-link: start on the requested question when present.
+          this.currentIndex.set(this.findFocusIndex());
           this.checkIfAlreadyAnswered();
         });
       }
     });
+  }
+
+  /** Index of the deep-linked question in the loaded set (or 0). */
+  private findFocusIndex(): number {
+    if (!this.focusQuestionId) return 0;
+    const index = this.questions().findIndex((q) => this.matchesFocusId(q.id));
+    return index >= 0 ? index : 0;
+  }
+
+  /** True when a loaded question corresponds to the deep-linked notebook question. */
+  private matchesFocusId(questionId: string): boolean {
+    if (!this.focusQuestionId) return false;
+    return (
+      questionId === this.focusQuestionId ||
+      this.toeicService.getBaseQuestionId(questionId) === this.focusQuestionId
+    );
   }
 
   selectOption(index: number) {
