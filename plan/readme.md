@@ -99,3 +99,33 @@ Commit kết thúc round: `97eb60f` (notebook), `d8e4d0d` (a11y timer/focus),
 ## Review Log Round 2
 
 - Self-review: whitelist key name khớp với `toeic.routes.js:55` (chỉ đọc `omniroute`). Test `succeeds even if key does not exist` cũ chính là assert hành vi inject — đổi thành test chặn non-whitelist. Batch cap 20 không phá UI (UI chỉ gửi ≤4 batch/part test).
+
+---
+
+# Round 3 (2026-10-29) — Follow-up: notebook persistence + deep-link practice
+
+## Kết quả Review (audit đợt 3)
+
+| # | Severity | Vị trí | Vấn đề | Fix |
+|---|----------|--------|--------|-----|
+| R3-1 | FEATURE | be + ui | Notebook flag "đã ôn" chỉ nằm trong localStorage → mất khi đổi máy/clear storage | Store `data/notebook/{userId}.json` + GET/PUT/DELETE `/api/toeic/notebook/:userId` (sanitize userId chống path-traversal, cap 500 ids, atomic write, dedupe); UI `syncNotebookReviewed()` merge BE ↔ localStorage (BE là nguồn đúng khi online, localStorage là optimistic cache/fallback), PUT full-list fire-and-forget khi toggle, sync on init |
+| R3-2 | FEATURE | ui notebook → practice | "Luyện Part X" chỉ tới trang luyện chung — không tới đúng câu sai | Link truyền `?questionId=<base id>`; `getBaseQuestionId()` tách suffix session (`base-ts-rand-idx`, Part 6/7 có thêm `-passage-question`) từ id FE, map trực tiếp cho câu vừa load + heuristic cho id phiên cũ. Part 5 mở đúng câu; Part 6/7 nhảy tới passage chứa câu + scroll flash vào card (Part 7 tự chọn mini-test để bỏ màn chọn mode). Fallback êm khi câu không có trong session mới |
+| R3-3 | BUG (minor) | be/routes, ui part6 | Part 6 `scrollToQuestion()` tìm `#q-card-{n}` nhưng question-list Part 6 không bao giờ render id đó → gap-click scroll là no-op | Thêm `[id]="'q-card-' + q.questionNumber"` vào card Part 6 (Part 7 đã có sẵn) |
+
+## Trạng thái Round 3
+
+- [x] BE: `db/notebook-store.js` + `routes/notebook.routes.js` mount tại `/api/toeic/notebook` + test (store 12 tests tmpdir, routes 10 tests supertest) — pattern đồng bộ test-history-store
+- [x] FE: `BE_NOTEBOOK_URL`, `syncNotebookReviewed`/`persistNotebookReviewed` trong ToeicService, notebook sync OnInit; test merge/fallback/PUT (9 test mới service + 2 test notebook component)
+- [x] Deep-link: `getBaseQuestionId` + track base id ở 3 loader, `practiceQueryParams()` notebook, focus trong cả 3 practice component (+ spec provider `provideRouter`)
+- [x] Test: BE vitest **180/180** (159 baseline + 21 mới); FE ng test **245/245** (235 baseline + 10 mới); `ng build` production sạch, 0 warning
+- [x] Commits nhỏ kiểu conventional, **local only — KHÔNG push** (push round 3 xử lý riêng)
+
+## Review Log Round 3
+
+- Self-review: cân nhắc fetch câu hỏi theo id từ BE bank (`GET /bank/:part/item/:id`) cho deep-link nhưng bỏ — phạm vi yêu cầu là "focus/scroll tới câu trong session mới"; base-id match đã phủ đúng ca câu được phục vụ từ bank. Đã xóa một bản nháp feature `?highlight=` trên /notebook (dead code, không ai điều hướng tới). Regex tách suffix session (`/^(.+)-\d{10,}-[a-z0-9]+(?:-\d+)*$/i`) chỉ là fallback khi map thiếu (id của session cũ) — map chính xác luôn được ưu tiên.
+
+## Remaining risks Round 3
+
+- **Deep-link best-effort**: câu AI mới sinh mỗi session có id mới; deep-link chỉ nhảy đúng câu khi nó được phục vụ lại (thường từ BE bank — vẫn hay gặp vì bank phục vụ cache-first). Khi không tìm thấy, practice chạy bình thường, không có thông báo.
+- **PUT full-list**: mỗi toggle đồng bộ toàn bộ danh sách id (≤500, vài chục KB worst case) — chấp nhận cho app cá nhân; nếu cần scale thì đổi sang PATCH add/remove.
+- **Merge là union**: id đã ôn bị xóa ở máy A nhưng máy B sync sau sẽ đưa id đó trở lại (last-writer-wins per id-set, không per-id tombstone). Khói path cho app 1-user.
