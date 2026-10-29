@@ -1,6 +1,18 @@
 import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { ToeicService } from '../../core/services/toeic.service';
+import { CATEGORIES } from '../../core/constants/app.constants';
+
+/** Display config for the per-category performance card (dedupes the HTML). */
+const CATEGORY_META: Array<{ key: string; label: string; badge: string; fill: string }> = [
+  { key: CATEGORIES.GRAMMAR, label: 'Ngữ pháp (Grammar)', badge: 'badge-grammar', fill: 'grammar-fill' },
+  { key: CATEGORIES.VOCABULARY, label: 'Từ vựng (Vocabulary)', badge: 'badge-vocabulary', fill: 'vocab-fill' },
+  { key: CATEGORIES.WORD_FORMS, label: 'Từ loại (Word Forms)', badge: 'badge-wordform', fill: 'wordform-fill' },
+  { key: CATEGORIES.SENTENCE_INSERTION, label: 'Điền câu (Sentence Insertion)', badge: 'badge-sentence-insertion', fill: 'sentence-insertion-fill' },
+  { key: CATEGORIES.SINGLE_PASSAGE, label: 'Đơn đoạn văn (Single Passage)', badge: 'badge-single-passage', fill: 'single-passage-fill' },
+  { key: CATEGORIES.DOUBLE_PASSAGE, label: 'Đoạn văn kép (Double Passage)', badge: 'badge-double-passage', fill: 'double-passage-fill' },
+  { key: CATEGORIES.TRIPLE_PASSAGE, label: 'Đoạn văn ba (Triple Passage)', badge: 'badge-triple-passage', fill: 'triple-passage-fill' },
+];
 
 @Component({
   selector: 'app-dashboard',
@@ -21,44 +33,20 @@ export class DashboardComponent {
     return s.totalAnswered > 0 ? Math.round((s.totalCorrect / s.totalAnswered) * 100) : 0;
   });
 
-  readonly grammarAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Grammar'];
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly vocabAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Vocabulary'];
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly wordFormAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Word Forms'];
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly sentenceInsertionAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Sentence Insertion'];
-    if (!s) return 0;
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly singlePassageAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Single Passage'];
-    if (!s) return 0;
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly doublePassageAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Double Passage'];
-    if (!s) return 0;
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
-
-  readonly triplePassageAccuracy = computed(() => {
-    const s = this.stats().categoryStats['Triple Passage'];
-    if (!s) return 0;
-    return s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0;
-  });
+  /** One computed map replaces the 7 copy-pasted per-category computed signals. */
+  readonly categoryRows = computed(() =>
+    CATEGORY_META.map((meta) => {
+      const s = (this.stats().categoryStats || {})[meta.key] || { answered: 0, correct: 0 };
+      const answered = s.answered ?? 0;
+      const correct = s.correct ?? 0;
+      return {
+        ...meta,
+        answered,
+        correct,
+        accuracy: answered > 0 ? Math.round((correct / answered) * 100) : 0,
+      };
+    }),
+  );
 
   // Recent history (last 5 items)
   readonly recentHistory = computed(() => {

@@ -108,32 +108,18 @@ describe('DashboardComponent', () => {
     expect(component.accuracy()).toBe(70); // 7/10 = 70%
   });
 
-  it('should calculate grammar accuracy correctly', () => {
-    expect(component.grammarAccuracy()).toBe(75); // 3/4 = 75%
-  });
-
-  it('should calculate vocabulary accuracy correctly', () => {
-    expect(component.vocabAccuracy()).toBe(67); // 2/3 ≈ 67%
-  });
-
-  it('should calculate word form accuracy correctly', () => {
-    expect(component.wordFormAccuracy()).toBe(67); // 2/3 ≈ 67%
-  });
-
-  it('should calculate sentence insertion accuracy correctly', () => {
-    expect(component.sentenceInsertionAccuracy()).toBe(80); // 4/5 = 80%
-  });
-
-  it('should calculate single passage accuracy correctly', () => {
-    expect(component.singlePassageAccuracy()).toBe(83); // 5/6 ≈ 83%
-  });
-
-  it('should calculate double passage accuracy correctly', () => {
-    expect(component.doublePassageAccuracy()).toBe(75); // 3/4 = 75%
-  });
-
-  it('should calculate triple passage accuracy correctly', () => {
-    expect(component.triplePassageAccuracy()).toBe(67); // 2/3 ≈ 67%
+  it('should calculate per-category accuracies via categoryRows', () => {
+    const rows = component.categoryRows();
+    const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(byKey['Grammar'].accuracy).toBe(75); // 3/4 = 75%
+    expect(byKey['Vocabulary'].accuracy).toBe(67); // 2/3 ≈ 67%
+    expect(byKey['Word Forms'].accuracy).toBe(67); // 2/3 ≈ 67%
+    expect(byKey['Sentence Insertion'].accuracy).toBe(80); // 4/5 = 80%
+    expect(byKey['Single Passage'].accuracy).toBe(83); // 5/6 ≈ 83%
+    expect(byKey['Double Passage'].accuracy).toBe(75); // 3/4 = 75%
+    expect(byKey['Triple Passage'].accuracy).toBe(67); // 2/3 ≈ 67%
+    expect(byKey['Grammar'].answered).toBe(4);
+    expect(byKey['Grammar'].correct).toBe(3);
   });
 
   it('should return 0 accuracy when no questions answered', () => {
@@ -155,10 +141,10 @@ describe('DashboardComponent', () => {
     fixture.detectChanges();
 
     expect(component.accuracy()).toBe(0);
-    expect(component.grammarAccuracy()).toBe(0);
+    expect(component.categoryRows().every((r) => r.accuracy === 0)).toBe(true);
   });
 
-  it('should return 0 for missing category stats', () => {
+  it('should return 0 accuracies for missing category stats', () => {
     const statsWithoutCategories = signal(createMockStats({
       categoryStats: {} as any,
     }));
@@ -169,10 +155,9 @@ describe('DashboardComponent', () => {
     const newComponent = newFixture.componentInstance;
 
     // Check computed signals without rendering template (which would crash on undefined categories)
-    expect(newComponent.sentenceInsertionAccuracy()).toBe(0);
-    expect(newComponent.singlePassageAccuracy()).toBe(0);
-    expect(newComponent.doublePassageAccuracy()).toBe(0);
-    expect(newComponent.triplePassageAccuracy()).toBe(0);
+    const rows = newComponent.categoryRows();
+    expect(rows.length).toBe(7);
+    expect(rows.every((r) => r.accuracy === 0 && r.answered === 0 && r.correct === 0)).toBe(true);
   });
 
   it('should return recent history sorted by timestamp descending (last 5)', () => {

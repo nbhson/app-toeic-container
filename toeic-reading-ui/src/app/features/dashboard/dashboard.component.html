@@ -140,153 +140,20 @@
       <p class="card-subtitle">Chi tiết kết quả theo phân loại câu hỏi trong TOEIC Part 5.</p>
 
       <div class="category-list">
-        <!-- Grammar -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-grammar">Ngữ pháp (Grammar)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Grammar'].correct }}/{{
-                stats().categoryStats['Grammar'].answered
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill grammar-fill" [style.width.%]="grammarAccuracy()"></div>
+        @for (row of categoryRows(); track row.key) {
+          <div class="category-item">
+            <div class="category-meta">
+              <span class="badge" [class]="row.badge">{{ row.label }}</span>
+              <span class="category-ratio">{{ row.correct }}/{{ row.answered }} câu</span>
             </div>
-            <span class="progress-percentage">{{ grammarAccuracy() }}%</span>
-          </div>
-        </div>
-
-        <!-- Vocabulary -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-vocabulary">Từ vựng (Vocabulary)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Vocabulary'].correct }}/{{
-                stats().categoryStats['Vocabulary'].answered
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill vocab-fill" [style.width.%]="vocabAccuracy()"></div>
+            <div class="progress-container">
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" [class]="row.fill" [style.width.%]="row.accuracy"></div>
+              </div>
+              <span class="progress-percentage">{{ row.accuracy }}%</span>
             </div>
-            <span class="progress-percentage">{{ vocabAccuracy() }}%</span>
           </div>
-        </div>
-
-        <!-- Word Forms -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-wordform">Từ loại (Word Forms)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Word Forms'].correct }}/{{
-                stats().categoryStats['Word Forms'].answered
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill wordform-fill"
-                [style.width.%]="wordFormAccuracy()"
-              ></div>
-            </div>
-            <span class="progress-percentage">{{ wordFormAccuracy() }}%</span>
-          </div>
-        </div>
-
-        <!-- Sentence Insertion -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-sentence-insertion">Điền câu (Sentence Insertion)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Sentence Insertion']?.correct || 0 }}/{{
-                stats().categoryStats['Sentence Insertion']?.answered || 0
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill sentence-insertion-fill"
-                [style.width.%]="sentenceInsertionAccuracy()"
-              ></div>
-            </div>
-            <span class="progress-percentage">{{ sentenceInsertionAccuracy() }}%</span>
-          </div>
-        </div>
-
-        <!-- Single Passage -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-single-passage">Đơn đoạn văn (Single Passage)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Single Passage']?.correct || 0 }}/{{
-                stats().categoryStats['Single Passage']?.answered || 0
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill single-passage-fill"
-                [style.width.%]="singlePassageAccuracy()"
-              ></div>
-            </div>
-            <span class="progress-percentage">{{ singlePassageAccuracy() }}%</span>
-          </div>
-        </div>
-
-        <!-- Double Passage -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-double-passage">Đoạn văn kép (Double Passage)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Double Passage']?.correct || 0 }}/{{
-                stats().categoryStats['Double Passage']?.answered || 0
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill double-passage-fill"
-                [style.width.%]="doublePassageAccuracy()"
-              ></div>
-            </div>
-            <span class="progress-percentage">{{ doublePassageAccuracy() }}%</span>
-          </div>
-        </div>
-
-        <!-- Triple Passage -->
-        <div class="category-item">
-          <div class="category-meta">
-            <span class="badge badge-triple-passage">Đoạn văn ba (Triple Passage)</span>
-            <span class="category-ratio"
-              >{{ stats().categoryStats['Triple Passage']?.correct || 0 }}/{{
-                stats().categoryStats['Triple Passage']?.answered || 0
-              }}
-              câu</span
-            >
-          </div>
-          <div class="progress-container">
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill triple-passage-fill"
-                [style.width.%]="triplePassageAccuracy()"
-              ></div>
-            </div>
-            <span class="progress-percentage">{{ triplePassageAccuracy() }}%</span>
-          </div>
-        </div>
+        }
       </div>
 
       <div class="action-shortcuts">
