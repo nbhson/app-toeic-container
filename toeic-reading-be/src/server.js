@@ -11,6 +11,10 @@ import readingTestRoutes from './routes/reading-test.routes.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Behind the container's nginx proxy: honor X-Forwarded-For so req.ip (used by
+// the rate limiter) is the real client address instead of the proxy IP.
+app.set('trust proxy', 1);
+
 // CORS: restrict to known frontends. Set FRONTEND_ORIGIN="*" to allow all
 // (local dev default) or a comma-separated allowlist in production, e.g.
 // FRONTEND_ORIGIN="https://toeic.example.com".
