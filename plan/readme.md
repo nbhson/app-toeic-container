@@ -129,3 +129,50 @@ Commit kết thúc round: `97eb60f` (notebook), `d8e4d0d` (a11y timer/focus),
 - **Deep-link best-effort**: câu AI mới sinh mỗi session có id mới; deep-link chỉ nhảy đúng câu khi nó được phục vụ lại (thường từ BE bank — vẫn hay gặp vì bank phục vụ cache-first). Khi không tìm thấy, practice chạy bình thường, không có thông báo.
 - **PUT full-list**: mỗi toggle đồng bộ toàn bộ danh sách id (≤500, vài chục KB worst case) — chấp nhận cho app cá nhân; nếu cần scale thì đổi sang PATCH add/remove.
 - **Merge là union**: id đã ôn bị xóa ở máy A nhưng máy B sync sau sẽ đưa id đó trở lại (last-writer-wins per id-set, không per-id tombstone). Khói path cho app 1-user.
+
+---
+
+# Round 4 (2026-10-29) — Follow-up: notebook PATCH per-id + Docker review
+
+## Kết quả Review (audit đợt 4)
+
+| # | Severity | Vị trí | Vấn đề | Fix |
+|---|----------|--------|--------|-----|
+| R4-1 | PERF/FEATURE | be + ui | Round 3 sync mỗi toggle là PUT full-list (≤500 ids, vài chục KB worst case) | BE: `PATCH /api/toeic/notebook/:userId` nhận `{questionId, reviewed}` — add/remove 1 id atomic (read-modify-write trong 1 tick đồng bộ, cùng cap 500 + id ≤200 ký tự, idempotent: thêm id đã có / xóa id không có = no-op không ghi lại); UI `setNotebookReviewed` gọi PATCH per-id fire-and-forget, PUT full-list chỉ còn cho merge lần đầu load |
+| R4-2 | REVIEW | docker-compose.yml + Dockerfiles | Review (không build — không có Docker runtime) | Xem bảng dưới |
+| R4-3 | MINOR | toeic-reading-ui | Thiếu `.dockerignore` — `COPY . .` trong UI Dockerfile đẩy `.angular/` cache (hàng trăm MB), `dist/`, `.git` vào build context → build chậm, risk cache cũ | Thêm `.dockerignore` cho cả BE (loại `data/`, `.env`, `node_modules/`) và UI |
+| R4-4 | MINOR | docker-compose.yml | `env_file: .env` bắt buộc — container không boot được nếu thiếu file (mọi env BE đều có default trong code) | `required: false` cho env_file |
+| R4-5 | MINOR | ui/nginx.conf | Không có cache header — index.html và JS/CSS hash đều revalidate mỗi lần | `no-cache` cho index.html, `public, immutable` 30d cho asset hash; `/api/` đổi sang `^~` để regex cache không chặn đường API |
+
+## Docker review chi tiết (không build)
+
+| Kiểm tra | Kết quả |
+|----------|---------|
+| Volume phủ `data/notebook/` (mới Round 3) | ✓ — bind mount cả thư mục `./toeic-reading-be/data:/app/data`, mọi store con (`keys.json`, `bank/`, `test-history/`, `notebook/`) đều nằm trong đó; không cần mount thêm |
+| BE Dockerfile | ✓ `npm ci --omit=dev`, `mkdir -p /app/data`, USER node (non-root), HEALTHCHECK khớp compose |
+| UI Dockerfile | ✓ build 2 stage, `ng build` (production mặc định), copy đúng `dist/toeic-app/browser` (khớp outputPath angular.json) |
+| nginx proxy | ✓ `proxy_pass http://backend:3000` giữ nguyên URI `/api/...`, X-Forwarded-* có từ Round 1 |
+| Compose healthchecks | ✓ redis-cli ping; BE fetch /api/health; FE busybox wget (có sẵn trong nginx:alpine) |
+| compose config | ✓ `docker compose config` validate OK (CLI-only) |
+| Đã fix | R4-3 (.dockerignore x2), R4-4 (env_file optional), R4-5 (nginx cache) |
+
+## Trạng thái Round 4
+
+- [x] BE: `updateReviewedId` (store, atomic single-id) + `PATCH /api/toeic/notebook/:userId` + tests (6 store + 4 route)
+- [x] FE: `patchNotebookReviewed` (PATCH per-id fire-and-forget), `setNotebookReviewed` không còn PUT full-list; `syncNotebookReviewed` giữ PUT cho initial merge; spec cập nhật + 3 test mới
+- [x] Docker review: compose volume đã phủ `data/notebook/`, thêm `.dockerignore` BE+UI, `env_file` required:false, nginx cache header
+- [x] Test: BE vitest **190/190** (180 baseline + 10 mới); FE ng test **246/246** (245 baseline + 1 net mới); `ng build` production sạch, **0 warning**
+- [x] Commits nhỏ kiểu conventional, **local only — KHÔNG push**
+
+## Review Log Round 4
+
+- Cân nhắc cho `clearReviewed()` gọi batch API riêng — bỏ: nó đã giảm còn N PATCH nhỏ (thay vì N PUT full-list), số lần xóa thủ công nhỏ, không đáng thêm endpoint. 
+- `updateReviewedId` dùng read-modify-write đồng bộ trong 1 handler tick — Node single-thread nên không thể interleave giữa 2 request trong cùng process; đa-instance (multi-container BE) cần lock ngoài scope app 1-user.
+- Compose `env_file.required: false` cần docker compose ≥ v2.24 (chuẩn từ 2023) — ghi nhận yêu cầu phiên bản.
+- **Pre-existing flake xác nhận (không phải do round 4)**: ~1/5 lần chạy, FE ng test in `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending` ở `toeic.service.spec.ts` nhưng 246/246 vẫn pass; tái hiện trên cả code baseline (stash) → lỗi teardown của vitest-runner, không phải bug code.
+
+## Remaining risks Round 4
+
+- PATCH đọc-ghi file sync trong handler: nếu nhiều tiến trình BE chạy song song (không xảy ra với compose hiện tại — 1 container) có thể mất update race; chấp nhận cho single-user.
+- UI không tự enforce cap 500 phía client trước khi PATCH — BE từ chối id thứ 501 (400), FE chỉ warn ra console; localStorage vẫn ghi (không mất dữ liệu local, BE là nguồn truth khi online).
+- nginx regex cache chưa set `proxy_cache`/brotli — không cần cho app cá nhân; nếu thêm static build hash mới nhớ immutable đã phủ.
