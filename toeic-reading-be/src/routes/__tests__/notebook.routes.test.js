@@ -86,6 +86,62 @@ describe('notebook.routes', () => {
     });
   });
 
+  describe('PATCH /:userId', () => {
+    const USER = 'user-nb-patch-test';
+
+    afterEach(async () => {
+      await request(app).delete(`/api/toeic/notebook/${USER}`);
+    });
+
+    it('adds a single id and GET reflects it', async () => {
+      const patch = await request(app)
+        .patch(`/api/toeic/notebook/${USER}`)
+        .send({ questionId: 'q1', reviewed: true });
+      expect(patch.status).toBe(200);
+      expect(patch.body.success).toBe(true);
+      expect(patch.body.reviewedIds).toEqual(['q1']);
+
+      const get = await request(app).get(`/api/toeic/notebook/${USER}`);
+      expect(get.body.reviewedIds).toEqual(['q1']);
+    });
+
+    it('removes a single id without touching the others', async () => {
+      await request(app).put(`/api/toeic/notebook/${USER}`).send({ reviewedIds: ['q1', 'q2'] });
+      const patch = await request(app)
+        .patch(`/api/toeic/notebook/${USER}`)
+        .send({ questionId: 'q1', reviewed: false });
+      expect(patch.status).toBe(200);
+      expect(patch.body.reviewedIds).toEqual(['q2']);
+    });
+
+    it('is idempotent — toggling the same state twice keeps one entry', async () => {
+      await request(app).patch(`/api/toeic/notebook/${USER}`).send({ questionId: 'q1', reviewed: true });
+      const again = await request(app)
+        .patch(`/api/toeic/notebook/${USER}`)
+        .send({ questionId: 'q1', reviewed: true });
+      expect(again.status).toBe(200);
+      expect(again.body.reviewedIds).toEqual(['q1']);
+    });
+
+    it('returns 400 for missing/invalid questionId or reviewed', async () => {
+      const noId = await request(app).patch(`/api/toeic/notebook/${USER}`).send({ reviewed: true });
+      expect(noId.status).toBe(400);
+      expect(noId.body.error).toContain('questionId');
+
+      const noReviewed = await request(app)
+        .patch(`/api/toeic/notebook/${USER}`)
+        .send({ questionId: 'q1' });
+      expect(noId.status).toBe(400);
+      expect(noReviewed.body.error).toContain('reviewed');
+
+      const wrongType = await request(app)
+        .patch(`/api/toeic/notebook/${USER}`)
+        .send({ questionId: 'q1', reviewed: 'true' });
+      expect(wrongType.status).toBe(400);
+      expect(wrongType.body.error).toContain('reviewed');
+    });
+  });
+
   describe('DELETE /:userId', () => {
     it('clears the stored reviewed ids and tolerates a missing user', async () => {
       const USER = 'user-nb-del-test';

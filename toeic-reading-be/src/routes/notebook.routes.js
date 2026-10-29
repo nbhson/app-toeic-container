@@ -60,6 +60,27 @@ router.put('/:userId', (req, res) => {
 });
 
 /**
+ * PATCH /api/toeic/notebook/:userId
+ * Single-toggle update: adds or removes one question id from the reviewed
+ * list atomically (same caps as PUT). Cheaper than the full-list PUT.
+ * Body: { questionId: string, reviewed: boolean }
+ */
+router.patch('/:userId', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { questionId, reviewed } = req.body ?? {};
+    const stored = notebookStore.updateReviewedId(userId, questionId, reviewed);
+    res.json({ success: true, userId, reviewedIds: stored });
+  } catch (error) {
+    if (error instanceof NotebookValidationError) {
+      return res.status(400).json({ error: `Invalid notebook payload: ${error.message}` });
+    }
+    console.error('Error updating notebook:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+/**
  * DELETE /api/toeic/notebook/:userId
  * Clears the stored notebook reviewed flags for a user (local flags stay).
  */
