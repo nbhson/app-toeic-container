@@ -27,9 +27,14 @@ services:
     environment:
       - PORT=3000
     env_file:
-      - ./toeic-reading-be/.env
+      # Optional: the container boots with code defaults when .env is absent
+      # (all BE envs have defaults; key can be saved via /api/toeic/keys).
+      - path: ./toeic-reading-be/.env
+        required: false
     volumes:
-      # Persist keys + user stats + question bank across rebuilds.
+      # Persist keys, stats, question bank, test history AND the notebook
+      # reviewed-id store (data/notebook/ added in Round 3) across rebuilds —
+      # the whole data dir is bind-mounted, so all per-user stores are covered.
       - ./toeic-reading-be/data:/app/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
