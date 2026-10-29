@@ -7,6 +7,7 @@ import keysRoutes from './routes/keys.routes.js';
 import statsRoutes from './routes/stats.routes.js';
 import bankRoutes from './routes/bank.routes.js';
 import readingTestRoutes from './routes/reading-test.routes.js';
+import notebookRoutes from './routes/notebook.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +62,7 @@ app.use('/api/toeic/bank', bankRoutes);
 app.use('/api/toeic/reading-test', readingTestRoutes);
 app.use('/api/toeic', toeicRoutes);
 app.use('/api/toeic/keys', requireAdminKey, keysRoutes);
+app.use('/api/toeic/notebook', notebookRoutes);
 app.use('/api/toeic/stats', statsRoutes);
 
 // Health check
