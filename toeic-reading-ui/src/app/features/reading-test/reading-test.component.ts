@@ -70,6 +70,13 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
   private resolveLeave: ((value: boolean) => void) | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
 
+  /** Text for the visually-hidden live region — updated only at key time
+   * thresholds (10/5/1 min) so screen readers are warned once per threshold
+   * instead of every second. */
+  readonly timerAnnouncement = signal<string | null>(null);
+  private announcedThresholds = new Set<number>();
+  private static readonly ANNOUNCE_AT_MINUTES = [10, 5, 1];
+
   /** Absolute deadline (ms epoch) — the countdown is derived from it so the
    * timer never drifts, even when the tab is throttled in the background. */
   private endTime = 0;
@@ -285,16 +292,31 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
   private startTimer() {
     this.stopTimer();
     this.endTime = Date.now() + this.remainingSeconds() * 1000;
+    this.announcedThresholds.clear();
+    this.timerAnnouncement.set(null);
     this.timerId = setInterval(() => {
       // Always derive remaining time from the absolute deadline — a plain
       // per-tick countdown drifts when the tab is throttled in the background.
       const left = Math.max(0, Math.round((this.endTime - Date.now()) / 1000));
       this.remainingSeconds.set(left);
+      this.announceTimeThreshold(left);
       if (left <= 0) {
         this.stopTimer();
         this.finalizeSubmission(); // auto-submit: no confirmation needed
       }
     }, 1000);
+  }
+
+  /** Warns screen-reader users once when the clock hits 10/5/1 minute(s) left. */
+  private announceTimeThreshold(left: number) {
+    for (const minutes of ReadingTestComponent.ANNOUNCE_AT_MINUTES) {
+      const seconds = minutes * 60;
+      if (left <= seconds && !this.announcedThresholds.has(seconds)) {
+        this.announcedThresholds.add(seconds);
+        this.timerAnnouncement.set(`Còn ${minutes} phút`);
+        return;
+      }
+    }
   }
 
   private stopTimer() {

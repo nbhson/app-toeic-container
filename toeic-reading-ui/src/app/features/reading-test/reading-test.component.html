@@ -29,6 +29,7 @@
   @if (phase() === 'testing' || phase() === 'result') {
     <div class="rt-timerbar">
       <span class="rt-timer" [class.rt-timer-danger]="remainingSeconds() < 300" role="timer" [attr.aria-label]="'Thời gian còn lại: ' + timeDisplay()">{{ timeDisplay() }}</span>
+      <span class="sr-only" role="status" aria-live="assertive">{{ timerAnnouncement() }}</span>
       <span class="rt-progress">Đã làm {{ answeredCount() }}/{{ totalQuestions() }} câu</span>
       @if (flaggedCount() > 0) {
         <span class="rt-flag-count" title="Số câu được đánh dấu ôn lại">🚩 {{ flaggedCount() }}</span>
