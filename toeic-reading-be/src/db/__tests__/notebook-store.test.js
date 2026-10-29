@@ -102,4 +102,49 @@ describe('notebook store', () => {
     expect(store.getReviewedIds('user1')).toEqual([]);
     expect(store.deleteNotebook('user1')).toBe(false);
   });
+
+  describe('updateReviewedId (single-toggle PATCH)', () => {
+    it('adds one id to an existing list', () => {
+      store.setReviewedIds('user1', ['q1', 'q2']);
+      expect(store.updateReviewedId('user1', 'q3', true)).toEqual(['q1', 'q2', 'q3']);
+      expect(store.getReviewedIds('user1')).toEqual(['q1', 'q2', 'q3']);
+    });
+
+    it('creates the file when adding to an empty user', () => {
+      expect(store.updateReviewedId('new-user', 'q1', true)).toEqual(['q1']);
+      expect(store.getReviewedIds('new-user')).toEqual(['q1']);
+    });
+
+    it('removes one id while keeping the others', () => {
+      store.setReviewedIds('user1', ['q1', 'q2', 'q3']);
+      expect(store.updateReviewedId('user1', 'q2', false)).toEqual(['q1', 'q3']);
+      expect(store.getReviewedIds('user1')).toEqual(['q1', 'q3']);
+    });
+
+    it('is idempotent — adding an existing id or removing a missing one does not rewrite', () => {
+      store.setReviewedIds('user1', ['q1']);
+      const before = store.updateReviewedId('user1', 'q1', true);
+      const after = store.updateReviewedId('user1', 'nope', false);
+      expect(before).toEqual(['q1']);
+      expect(after).toEqual(['q1']);
+    });
+
+    it('rejects invalid questionId and reviewed values', () => {
+      expect(() => store.updateReviewedId('user1', '', true)).toThrow(NotebookValidationError);
+      expect(() => store.updateReviewedId('user1', 42, true)).toThrow(NotebookValidationError);
+      expect(() => store.updateReviewedId('user1', 'x'.repeat(201), true)).toThrow(
+        NotebookValidationError,
+      );
+      expect(() => store.updateReviewedId('user1', 'q1', 'yes')).toThrow(NotebookValidationError);
+      expect(() => store.updateReviewedId('user1', 'q1', undefined)).toThrow(NotebookValidationError);
+    });
+
+    it('refuses to add past the cap', () => {
+      const full = Array.from({ length: MAX_NOTEBOOK_REVIEWED }, (_, i) => `q${i}`);
+      store.setReviewedIds('user1', full);
+      expect(() => store.updateReviewedId('user1', 'overflow', true)).toThrow(/maximum/);
+      // Removal still works at the cap.
+      expect(store.updateReviewedId('user1', 'q0', false)).toHaveLength(MAX_NOTEBOOK_REVIEWED - 1);
+    });
+  });
 });

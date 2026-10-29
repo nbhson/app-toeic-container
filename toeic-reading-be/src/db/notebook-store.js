@@ -2,8 +2,8 @@
  * File-based notebook store: server-side persistence of the wrong-answer
  * notebook's "đã ôn" (reviewed) flags, one file per user
  * (data/notebook/{userId}.json). The UI keeps localStorage as the optimistic
- * cache/fallback and syncs the full reviewed-id list through GET/PUT here
- * (Round 3).
+ * cache/fallback and syncs through GET here; initial load merges via PUT,
+ * per-toggle updates go through PATCH (Round 4).
  *
  * File shape: { updatedAt: number, reviewedIds: string[] }
  */
@@ -27,6 +27,22 @@ const MAX_ID_LENGTH = 200;
 
 /** Marks client-caused validation failures (→ HTTP 400) vs server faults (→ 500). */
 export class NotebookValidationError extends Error {}
+
+/**
+ * Validates + normalizes a single question id: non-empty string within the
+ * length cap.
+ * @param {unknown} input
+ * @returns {string}
+ */
+export function sanitizeNotebookId(input) {
+  if (typeof input !== 'string' || input.length === 0) {
+    throw new NotebookValidationError('questionId must be a non-empty string.');
+  }
+  if (input.length > MAX_ID_LENGTH) {
+    throw new NotebookValidationError(`questionId must not exceed ${MAX_ID_LENGTH} characters.`);
+  }
+  return input;
+}
 
 /**
  * Validates + normalizes a reviewedIds payload: array of non-empty strings,
@@ -115,6 +131,39 @@ export function createNotebookStore(dataDir = DEFAULT_DATA_DIR) {
     return reviewedIds;
   }
 
+  /**
+   * Adds or removes a single question id atomically (read-modify-write in one
+   * synchronous tick, so concurrent requests cannot interleave).
+   * @param {string} userId
+   * @param {unknown} questionId
+   * @param {unknown} reviewed
+   * @returns {string[]} The stored list after the update.
+   */
+  function updateReviewedId(userId, questionId, reviewed) {
+    const id = sanitizeNotebookId(questionId);
+    if (typeof reviewed !== 'boolean') {
+      throw new NotebookValidationError('reviewed must be a boolean.');
+    }
+    const existing = readNotebook(getFilePath(userId)).reviewedIds;
+    const set = new Set(existing);
+    if (reviewed) {
+      if (set.has(id)) return existing; // idempotent — no rewrite needed
+      if (existing.length >= MAX_NOTEBOOK_REVIEWED) {
+        throw new NotebookValidationError(
+          `notebook already has the maximum of ${MAX_NOTEBOOK_REVIEWED} reviewed ids.`,
+        );
+      }
+      set.add(id);
+    } else {
+      if (!set.has(id)) return existing;
+      set.delete(id);
+    }
+    const reviewedIds = [...set];
+    ensureDir();
+    writeJsonFileAtomic(getFilePath(userId), { updatedAt: Date.now(), reviewedIds });
+    return reviewedIds;
+  }
+
   function deleteNotebook(userId) {
     const filePath = getFilePath(userId);
     if (!existsSync(filePath)) return false;
@@ -122,7 +171,7 @@ export function createNotebookStore(dataDir = DEFAULT_DATA_DIR) {
     return true;
   }
 
-  return { getReviewedIds, setReviewedIds, deleteNotebook };
+  return { getReviewedIds, setReviewedIds, updateReviewedId, deleteNotebook };
 }
 
 /** Default instance using the production data directory. */
