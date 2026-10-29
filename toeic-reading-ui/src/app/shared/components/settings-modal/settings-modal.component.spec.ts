@@ -26,6 +26,9 @@ describe('SettingsModalComponent', () => {
 
     omnirouteServiceMock = {
       generateToeicQuestions: vi.fn(),
+      hasStoredOmniRouteKey: vi.fn().mockResolvedValue(false),
+      saveKey: vi.fn().mockResolvedValue(undefined),
+      deleteKey: vi.fn().mockResolvedValue(undefined),
     };
 
     await TestBed.configureTestingModule({
@@ -63,10 +66,22 @@ describe('SettingsModalComponent', () => {
   });
 
   describe('hasAnyKey computed', () => {
-    it('should return true when OmniRoute key exists', () => {
+    it('should return true when OmniRoute key exists (BE)', async () => {
+      (omnirouteServiceMock.hasStoredOmniRouteKey as any).mockResolvedValue(true);
+      const modalFixture = TestBed.createComponent(SettingsModalComponent);
+      modalFixture.detectChanges();
+      await modalFixture.whenStable();
+      modalFixture.detectChanges();
+      expect(modalFixture.componentInstance.hasAnyKey()).toBe(true);
+    });
+
+    it('should return true when legacy localStorage OmniRoute key exists', async () => {
       (toeicServiceMock.getOmniRouteApiKey as any).mockReturnValue('or-key');
-      const modal = TestBed.createComponent(SettingsModalComponent).componentInstance;
-      expect(modal.hasAnyKey()).toBe(true);
+      const modalFixture = TestBed.createComponent(SettingsModalComponent);
+      modalFixture.detectChanges();
+      await modalFixture.whenStable();
+      modalFixture.detectChanges();
+      expect(modalFixture.componentInstance.hasAnyKey()).toBe(true);
     });
 
     it('should return true when Gemini key exists', () => {
@@ -178,7 +193,7 @@ describe('SettingsModalComponent', () => {
   });
 
   describe('saveApiKeys', () => {
-    it('should save both keys and emit close/keySaved events', () => {
+    it('should save both keys and emit close/keySaved events', async () => {
       let closeEmitted = false;
       let keySavedEmitted = false;
       component.close.subscribe(() => (closeEmitted = true));
@@ -186,7 +201,7 @@ describe('SettingsModalComponent', () => {
 
       component.geminiApiKeyField.set('gemini-key');
       component.omnirouteApiKeyField.set('or-key');
-      component.saveApiKeys();
+      await component.saveApiKeys();
 
       expect(toeicServiceMock.setGeminiApiKey).toHaveBeenCalledWith('gemini-key');
       expect(toeicServiceMock.setOmniRouteApiKey).toHaveBeenCalledWith('or-key');
@@ -210,12 +225,12 @@ describe('SettingsModalComponent', () => {
   });
 
   describe('clearOmniRouteKey', () => {
-    it('should clear the OmniRoute API key and reset field', () => {
+    it('should clear the OmniRoute API key and reset field', async () => {
       let keySavedEmitted = false;
       component.keySaved.subscribe(() => (keySavedEmitted = true));
 
       component.omnirouteApiKeyField.set('existing-key');
-      component.clearOmniRouteKey();
+      await component.clearOmniRouteKey();
 
       expect(toeicServiceMock.setOmniRouteApiKey).toHaveBeenCalledWith('');
       expect(component.omnirouteApiKeyField()).toBe('');

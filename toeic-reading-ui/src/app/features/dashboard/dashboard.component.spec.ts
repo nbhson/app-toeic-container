@@ -83,6 +83,8 @@ describe('DashboardComponent', () => {
     toeicServiceMock = {
       stats: mockStats as unknown as ReturnType<typeof signal<UserStats>>,
       resetStats: vi.fn(),
+      getReviewQueue: vi.fn().mockReturnValue([]),
+      showSettingsModal: signal(false),
     };
 
     await TestBed.configureTestingModule({

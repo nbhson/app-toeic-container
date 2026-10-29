@@ -57,14 +57,15 @@ export class SettingsModalComponent implements OnInit {
 
   /**
    * Loads the OmniRoute key status from BE and Gemini from localStorage.
+   * Falls back to the localStorage legacy key when the BE is unreachable OR
+   * reports no stored key (backward compatibility with pre-BE installs).
    */
   async loadKeyStatus() {
-    // Load OmniRoute key status from BE
     try {
       const hasStored = await this.omnirouteService.hasStoredOmniRouteKey();
-      this.hasOmniRouteKey.set(hasStored);
+      this.hasOmniRouteKey.set(hasStored || !!this.toeicService.getOmniRouteApiKey());
     } catch {
-      // Fallback to localStorage check
+      // BE unreachable → localStorage check
       this.hasOmniRouteKey.set(!!this.toeicService.getOmniRouteApiKey());
     }
 

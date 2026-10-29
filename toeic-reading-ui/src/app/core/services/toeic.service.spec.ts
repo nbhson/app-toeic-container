@@ -17,6 +17,7 @@ describe('ToeicService', () => {
       generateToeicQuestions: vi.fn(),
       generateToeicPart6Passages: vi.fn(),
       generateToeicPart7Passages: vi.fn(),
+      generateToeicPart7Batch: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -74,7 +75,7 @@ describe('ToeicService', () => {
 
     it('should persist API key to localStorage', () => {
       service.setApiKey('persistent-key');
-      expect(localStorage.getItem(STORAGE_KEYS.API_KEY)).toBe('persistent-key');
+      expect(localStorage.getItem(STORAGE_KEYS.OMNIROUTE_API_KEY)).toBe('persistent-key');
     });
   });
 
@@ -234,7 +235,7 @@ describe('ToeicService', () => {
       expect(stats.history).toEqual([]);
     });
 
-    it('should clear stats from localStorage', () => {
+    it('should clear stats from localStorage', async () => {
       const mockQ: ToeicQuestion = {
         id: 'q1',
         question: 'Test?',
@@ -247,7 +248,7 @@ describe('ToeicService', () => {
       };
       (service as any).activeQuestionsMap.set(mockQ.id, mockQ);
       service.saveAnswer('q1', 0);
-      service.resetStats();
+      await service.resetStats();
 
       const storedData = localStorage.getItem(STORAGE_KEYS.STATS);
       expect(storedData).not.toBeNull();
@@ -404,12 +405,20 @@ describe('ToeicService', () => {
       };
 
       service.setApiKey('fake-key');
-      (omnirouteServiceMock.generateToeicPart7Passages as any)
-        .mockResolvedValueOnce([mockSinglePassage])
-        .mockResolvedValueOnce([mockDoublePassage]);
+      // loadPart7Passages uses the batch endpoint for the OmniRoute provider
+      (omnirouteServiceMock.generateToeicPart7Batch as any)
+        .mockResolvedValueOnce([mockSinglePassage, mockDoublePassage]);
 
       const result = await service.loadPart7Passages(false);
       expect(result).toHaveLength(2);
+      // Mini test = 1 Single + 1 Double batch
+      expect(omnirouteServiceMock.generateToeicPart7Batch).toHaveBeenCalledWith(
+        [
+          { passageType: 'Single', count: 1, startQuestionNumber: 147 },
+          { passageType: 'Double', count: 1, startQuestionNumber: 150 },
+        ],
+        'fake-key',
+      );
     });
 
     it('should load 15 passages for full mock test', async () => {
@@ -435,11 +444,13 @@ describe('ToeicService', () => {
           ],
         }));
 
-      (omnirouteServiceMock.generateToeicPart7Passages as any)
-        .mockResolvedValueOnce(makePassage('Single', 5))
-        .mockResolvedValueOnce(makePassage('Single', 5))
-        .mockResolvedValueOnce(makePassage('Double', 2))
-        .mockResolvedValueOnce(makePassage('Triple', 3));
+      (omnirouteServiceMock.generateToeicPart7Batch as any)
+        .mockResolvedValueOnce([
+          ...makePassage('Single', 5),
+          ...makePassage('Single', 5),
+          ...makePassage('Double', 2),
+          ...makePassage('Triple', 3),
+        ]);
 
       const result = await service.loadPart7Passages(true);
       expect(result).toHaveLength(15);
