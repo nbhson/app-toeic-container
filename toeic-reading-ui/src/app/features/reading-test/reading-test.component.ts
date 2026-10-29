@@ -12,6 +12,7 @@ import {
   ToeicQuestion,
   ToeicPart6Passage,
   ToeicPart7Passage,
+  TestResultSummary,
 } from '../../core/models/toeic.model';
 import { HasPendingChanges } from '../../core/guards/pending-changes.guard';
 import { ConfirmModalComponent } from '../../shared/components/confirm-modal/confirm-modal.component';
@@ -22,6 +23,12 @@ interface ScoreResult {
   percent: number;
   score: number;
   level: string;
+}
+
+interface PaletteEntry {
+  id: string;
+  number: number;
+  part: number;
 }
 
 type Phase = 'setup' | 'loading' | 'testing' | 'result';
@@ -51,9 +58,21 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
   /** questionId -> selected option index */
   readonly selected = signal<Record<string, number>>({});
 
+  /** questionId -> flagged for review */
+  readonly flagged = signal<Record<string, boolean>>({});
+
+  /** Server-side history of completed tests (for the score trend). */
+  readonly historyResults = signal<TestResultSummary[]>([]);
+  readonly historySaveFailed = signal<boolean>(false);
+
   showConfirmLeaveModal = signal<boolean>(false);
+  showConfirmSubmitModal = signal<boolean>(false);
   private resolveLeave: ((value: boolean) => void) | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
+
+  /** Absolute deadline (ms epoch) — the countdown is derived from it so the
+   * timer never drifts, even when the tab is throttled in the background. */
+  private endTime = 0;
 
   readonly timeDisplay = computed(() => {
     const s = Math.max(0, this.remainingSeconds());
@@ -70,6 +89,26 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
   );
 
   readonly answeredCount = computed(() => Object.keys(this.selected()).length);
+
+  readonly flaggedCount = computed(
+    () => Object.values(this.flagged()).filter(Boolean).length,
+  );
+
+  /** Flat, ordered question index powering the navigator palette. */
+  readonly questionIndex = computed<PaletteEntry[]>(() => {
+    const entries: PaletteEntry[] = [];
+    this.part5().forEach((q, i) => entries.push({ id: q.id, number: 101 + i, part: 5 }));
+    this.part6().forEach((p) =>
+      p.questions.forEach((q) => entries.push({ id: q.id, number: q.questionNumber, part: 6 })),
+    );
+    this.part7().forEach((p) =>
+      p.questions.forEach((q) => entries.push({ id: q.id, number: q.questionNumber, part: 7 })),
+    );
+    return entries;
+  });
+
+  /** Last 10 completed tests (newest last) for the mini score trend. */
+  readonly scoreTrend = computed(() => this.historyResults().slice(-10));
 
   readonly partScores = computed(() => {
     if (!this.isSubmitted()) return null;
@@ -115,8 +154,10 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
       this.part6.set(p6);
       this.part7.set(p7);
       this.selected.set({});
+      this.flagged.set({});
       this.isSubmitted.set(false);
       this.score.set(null);
+      this.historyResults.set([]);
       this.remainingSeconds.set(this.timeLimitMinutes() * 60);
       this.phase.set('testing');
       this.startTimer();
@@ -131,16 +172,31 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
     this.selected.update((prev) => ({ ...prev, [questionId]: optionIndex }));
   }
 
-  submit(auto = false) {
+  toggleFlag(questionId: string) {
+    if (this.isSubmitted()) return;
+    this.flagged.update((prev) => ({ ...prev, [questionId]: !prev[questionId] }));
+  }
+
+  /** "Nộp bài" click: when unanswered questions remain, confirm via modal. */
+  submit() {
     if (this.phase() !== 'testing' || this.isSubmitted()) return;
-    const total = this.totalQuestions();
-    const answered = this.answeredCount();
-    if (!auto && answered < total) {
-      const ok = confirm(
-        `Bạn còn ${total - answered} câu chưa trả lời. Nộp bài và tính các câu này là sai?`,
-      );
-      if (!ok) return;
+    const unanswered = this.totalQuestions() - this.answeredCount();
+    if (unanswered > 0) {
+      this.showConfirmSubmitModal.set(true);
+      return;
     }
+    this.finalizeSubmission();
+  }
+
+  onSubmitModalResponse(accept: boolean) {
+    this.showConfirmSubmitModal.set(false);
+    if (accept) {
+      this.finalizeSubmission();
+    }
+  }
+
+  private finalizeSubmission() {
+    if (this.phase() !== 'testing' || this.isSubmitted()) return;
     this.stopTimer();
     const answers: Array<{ selectedAnswer: number; correctAnswer: number }> = [];
     const push = (id: string) => {
@@ -156,8 +212,12 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
     this.isSubmitted.set(true);
     this.toeicService
       .scoreReadingTest(answers)
-      .then((r) => this.score.set(r))
-      .catch(() => {
+      .then(async (r) => {
+        this.score.set(r);
+        await this.recordHistory(r);
+      })
+      .catch(async () => {
+        // BE scorer unreachable: score locally, still record the attempt.
         const correct = answers.filter((a) => a.selectedAnswer === a.correctAnswer).length;
         this.score.set({
           correct,
@@ -166,8 +226,31 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
           score: 0,
           level: 'Không chấm được điểm online — xem số câu đúng ở trên.',
         });
+        await this.recordHistory(this.score()!);
       });
     this.phase.set('result');
+  }
+
+  /** Persists the finished test to the server-side history (best effort). */
+  private async recordHistory(score: ScoreResult) {
+    const partScores = this.partScores();
+    const updated = await this.toeicService.saveTestResult({
+      takenAt: Date.now(),
+      score: score.score,
+      correct: score.correct,
+      total: score.total,
+      percent: score.percent,
+      level: score.level,
+      partScores: partScores
+        ? { part5: partScores.part5, part6: partScores.part6, part7: partScores.part7 }
+        : undefined,
+    });
+    if (updated === null) {
+      this.historySaveFailed.set(true);
+      return;
+    }
+    this.historySaveFailed.set(false);
+    this.historyResults.set(updated);
   }
 
   restart() {
@@ -177,8 +260,11 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
     this.part6.set([]);
     this.part7.set([]);
     this.selected.set({});
+    this.flagged.set({});
     this.isSubmitted.set(false);
     this.score.set(null);
+    this.historyResults.set([]);
+    this.historySaveFailed.set(false);
     this.errorMessage.set(null);
   }
 
@@ -186,13 +272,27 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
     return String.fromCharCode(65 + index);
   }
 
+  /** Bar height (%) for the score trend — floors tiny scores so they stay visible. */
+  trendHeight(score: number): number {
+    return Math.max(4, (score / 495) * 100);
+  }
+
+  /** Scrolls the viewport to a question from the navigator palette. */
+  jumpTo(questionId: string) {
+    document.getElementById(`q-${questionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   private startTimer() {
     this.stopTimer();
+    this.endTime = Date.now() + this.remainingSeconds() * 1000;
     this.timerId = setInterval(() => {
-      const left = this.remainingSeconds() - 1;
+      // Always derive remaining time from the absolute deadline — a plain
+      // per-tick countdown drifts when the tab is throttled in the background.
+      const left = Math.max(0, Math.round((this.endTime - Date.now()) / 1000));
       this.remainingSeconds.set(left);
       if (left <= 0) {
-        this.submit(true);
+        this.stopTimer();
+        this.finalizeSubmission(); // auto-submit: no confirmation needed
       }
     }, 1000);
   }
@@ -212,6 +312,14 @@ export class ReadingTestComponent implements HasPendingChanges, OnDestroy {
   unloadNotification($event: any): void {
     if (this.hasUnsavedProgress()) {
       $event.returnValue = true;
+    }
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange() {
+    // Re-sync the countdown instantly when the user returns to the tab.
+    if (document.visibilityState === 'visible' && this.phase() === 'testing' && !this.isSubmitted()) {
+      this.remainingSeconds.set(Math.max(0, Math.round((this.endTime - Date.now()) / 1000)));
     }
   }
 

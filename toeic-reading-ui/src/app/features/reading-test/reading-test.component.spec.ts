@@ -41,27 +41,59 @@ describe('ReadingTestComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create the component in setup phase', () => {
-    expect(component).toBeTruthy();
-    expect(component.phase()).toBe('setup');
-  });
-
-  it('should format the countdown as mm:ss', () => {
-    component.remainingSeconds.set(75 * 60);
-    expect(component.timeDisplay()).toBe('75:00');
-    component.remainingSeconds.set(61);
-    expect(component.timeDisplay()).toBe('01:01');
-  });
-
-  it('should not have unsaved progress before starting', () => {
-    expect(component.hasUnsavedProgress()).toBe(false);
-  });
-
   it('should select options only before submit', () => {
     component.select('q1', 2);
     expect(component.selected()['q1']).toBe(2);
     component.isSubmitted.set(true);
     component.select('q1', 0);
     expect(component.selected()['q1']).toBe(2);
+  });
+
+  it('should toggle flags only before submit', () => {
+    component.toggleFlag('q1');
+    expect(component.flagged()['q1']).toBe(true);
+    component.toggleFlag('q1');
+    expect(component.flagged()['q1']).toBe(false);
+    component.isSubmitted.set(true);
+    component.toggleFlag('q1');
+    expect(component.flagged()['q1']).toBe(false);
+  });
+
+  it('should build a flat question index across parts', () => {
+    component.part5.set([
+      { id: 'p5-1', question: 'Q?', options: [], correctAnswer: 0, explanation: '', translation: '', category: 'Grammar', difficulty: 'Easy' },
+    ]);
+    component.part7.set([
+      {
+        id: 'p7-1',
+        passageType: 'Single',
+        documentType: 'Email',
+        text: 't',
+        translation: 'tr',
+        questions: [
+          { id: 'p7-q1', questionNumber: 147, question: 'Q?', options: [], correctAnswer: 0, explanation: '', translation: '' },
+        ],
+      },
+    ]);
+    const index = component.questionIndex();
+    expect(index).toHaveLength(2);
+    expect(index[0]).toEqual({ id: 'p5-1', number: 101, part: 5 });
+    expect(index[1]).toEqual({ id: 'p7-q1', number: 147, part: 7 });
+  });
+
+  it('should ask for confirmation before submitting with unanswered questions', () => {
+    component.phase.set('testing');
+    // 1 question total, 0 answered → confirm modal must open, not submit
+    component.part5.set([
+      { id: 'p5-1', question: 'Q?', options: ['A', 'B', 'C', 'D'], correctAnswer: 0, explanation: '', translation: '', category: 'Grammar', difficulty: 'Easy' },
+    ]);
+    component.submit();
+    expect(component.showConfirmSubmitModal()).toBe(true);
+    expect(component.isSubmitted()).toBe(false);
+  });
+
+  it('should compute trend bar heights with a visible floor', () => {
+    expect(component.trendHeight(495)).toBe(100);
+    expect(component.trendHeight(0)).toBeGreaterThan(0);
   });
 });

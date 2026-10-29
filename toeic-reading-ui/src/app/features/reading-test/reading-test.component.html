@@ -5,11 +5,11 @@
       <p class="page-subtitle">100 câu (Part 5: 30 · Part 6: 16 · Part 7: 54) · {{ timeLimitMinutes() }} phút · Thang điểm 5–495</p>
       <ul class="rt-rules">
         <li>Hết giờ bài tự động nộp; câu bỏ trống tính là sai.</li>
-        <li>Kết quả gồm điểm ước lượng, trình độ và đáp án chi tiết để ôn lại.</li>
+        <li>Kết quả gồm điểm ước lượng, trình độ, giải thích chi tiết và xu hướng điểm qua các lần thi.</li>
         <li>Cần cấu hình API Key (OmniRoute/Gemini) trong phần cài đặt trước khi bắt đầu.</li>
       </ul>
       @if (errorMessage()) {
-        <p class="rt-error">{{ errorMessage() }}</p>
+        <p class="rt-error" role="alert">{{ errorMessage() }}</p>
       }
       <div class="rt-actions">
         <button class="btn-primary" (click)="start()">Bắt đầu làm bài</button>
@@ -28,14 +28,39 @@
 
   @if (phase() === 'testing' || phase() === 'result') {
     <div class="rt-timerbar">
-      <span class="rt-timer" [class.rt-timer-danger]="remainingSeconds() < 300">{{ timeDisplay() }}</span>
+      <span class="rt-timer" [class.rt-timer-danger]="remainingSeconds() < 300" role="timer" [attr.aria-label]="'Thời gian còn lại: ' + timeDisplay()">{{ timeDisplay() }}</span>
       <span class="rt-progress">Đã làm {{ answeredCount() }}/{{ totalQuestions() }} câu</span>
+      @if (flaggedCount() > 0) {
+        <span class="rt-flag-count" title="Số câu được đánh dấu ôn lại">🚩 {{ flaggedCount() }}</span>
+      }
       @if (phase() === 'testing') {
         <button class="btn-primary" (click)="submit()">Nộp bài</button>
       } @else {
         <button class="btn-secondary" (click)="restart()">Làm đề mới</button>
       }
     </div>
+
+    <!-- Question navigator palette -->
+    <nav class="rt-palette glass-card" aria-label="Bảng điều hướng câu hỏi">
+      <div class="rt-palette-legend" aria-hidden="true">
+        <span><i class="lg lg-answered"></i>Đã làm</span>
+        <span><i class="lg"></i>Chưa làm</span>
+        <span><i class="lg lg-flag"></i>Đánh dấu</span>
+      </div>
+      <div class="rt-palette-grid" role="group" aria-label="Danh sách câu hỏi">
+        @for (item of questionIndex(); track item.id) {
+          <button
+            class="rt-dot"
+            type="button"
+            [class.answered]="selected()[item.id] !== undefined"
+            [class.flagged]="flagged()[item.id]"
+            [attr.aria-label]="'Câu ' + item.number + (selected()[item.id] !== undefined ? ', đã trả lời' : ', chưa trả lời') + (flagged()[item.id] ? ', đã đánh dấu' : '')"
+            [attr.aria-pressed]="!!flagged()[item.id]"
+            (click)="jumpTo(item.id)"
+          >{{ item.number }}</button>
+        }
+      </div>
+    </nav>
 
     @if (score()) {
       <div class="glass-card rt-card rt-result animate-pop">
@@ -48,6 +73,24 @@
             <span>Part 7: {{ partScores()!.part7.correct }}/{{ partScores()!.part7.total }}</span>
           </div>
         }
+        @if (scoreTrend().length > 1) {
+          <div class="rt-trend" role="img" [attr.aria-label]="'Xu hướng điểm: ' + scoreTrend().map(t => t.score).join(', ')">
+            <span class="rt-trend-label">Xu hướng điểm ({{ scoreTrend().length }} lần thi gần nhất)</span>
+            <div class="rt-trend-bars">
+              @for (r of scoreTrend(); track $index) {
+                <div
+                  class="rt-trend-bar"
+                  [style.height.%]="trendHeight(r.score)"
+                  [class.is-latest]="$last"
+                  title="{{ r.score }}/495"
+                ></div>
+              }
+            </div>
+          </div>
+        }
+        @if (historySaveFailed()) {
+          <p class="rt-note">Không lưu được kết quả vào lịch sử (backend không khả dụng) — lần thi này có thể không xuất hiện trong xu hướng điểm.</p>
+        }
         <p class="rt-note">Điểm là ước lượng (thang ETS thật thay đổi theo từng form đề). Xem đáp án đúng/sai chi tiết bên dưới để ôn lại.</p>
       </div>
     }
@@ -55,8 +98,13 @@
     <section class="rt-section">
       <h2>Part 5 — Incomplete Sentences ({{ part5().length }} câu)</h2>
       @for (q of part5(); track q.id; let i = $index) {
-        <div class="rt-q">
-          <p class="rt-stem"><strong>{{ 101 + i }}.</strong> {{ q.question }}</p>
+        <div class="rt-q" [id]="'q-' + q.id">
+          <p class="rt-stem">
+            <strong>{{ 101 + i }}.</strong> {{ q.question }}
+            <button type="button" class="rt-flag-btn" [class.active]="flagged()[q.id]" (click)="toggleFlag(q.id)"
+              [attr.aria-pressed]="!!flagged()[q.id]" [disabled]="isSubmitted()"
+              [attr.aria-label]="'Đánh dấu câu ' + (101 + i) + ' để ôn lại'">🚩</button>
+          </p>
           <div class="rt-opts">
             @for (opt of q.options; track $index; let oi = $index) {
               <button
@@ -66,9 +114,19 @@
                 [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
                 (click)="select(q.id, oi)"
                 [disabled]="isSubmitted()"
+                [attr.aria-pressed]="selected()[q.id] === oi"
               >{{ getOptionLetter(oi) }}. {{ opt }}</button>
             }
           </div>
+          @if (isSubmitted()) {
+            <details class="rt-review">
+              <summary>Xem giải thích</summary>
+              <p class="rt-explanation"><strong>Giải thích:</strong> {{ q.explanation || 'Chưa có giải thích cho câu này.' }}</p>
+              @if (q.translation) {
+                <p class="rt-translation"><strong>Dịch:</strong> {{ q.translation }}</p>
+              }
+            </details>
+          }
         </div>
       }
     </section>
@@ -79,8 +137,12 @@
         <div class="rt-passage">
           <p class="rt-text">{{ p.text }}</p>
           @for (q of p.questions; track q.id) {
-            <div class="rt-q">
-              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> Chọn đáp án đúng cho chỗ trống.</p>
+            <div class="rt-q" [id]="'q-' + q.id">
+              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> Chọn đáp án đúng cho chỗ trống.
+                <button type="button" class="rt-flag-btn" [class.active]="flagged()[q.id]" (click)="toggleFlag(q.id)"
+                  [attr.aria-pressed]="!!flagged()[q.id]" [disabled]="isSubmitted()"
+                  [attr.aria-label]="'Đánh dấu câu ' + q.questionNumber + ' để ôn lại'">🚩</button>
+              </p>
               <div class="rt-opts">
                 @for (opt of q.options; track $index; let oi = $index) {
                   <button
@@ -90,9 +152,16 @@
                     [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
                     (click)="select(q.id, oi)"
                     [disabled]="isSubmitted()"
+                    [attr.aria-pressed]="selected()[q.id] === oi"
                   >{{ getOptionLetter(oi) }}. {{ opt }}</button>
                 }
               </div>
+              @if (isSubmitted()) {
+                <details class="rt-review">
+                  <summary>Xem giải thích</summary>
+                  <p class="rt-explanation"><strong>Giải thích:</strong> {{ q.explanation || 'Chưa có giải thích cho câu này.' }}</p>
+                </details>
+              }
             </div>
           }
         </div>
@@ -106,8 +175,12 @@
           <p class="rt-doc-type">{{ p.documentType }}</p>
           <div class="rt-html" [innerHTML]="p.text"></div>
           @for (q of p.questions; track q.id) {
-            <div class="rt-q">
-              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> {{ q.question }}</p>
+            <div class="rt-q" [id]="'q-' + q.id">
+              <p class="rt-stem"><strong>Câu {{ q.questionNumber }}.</strong> {{ q.question }}
+                <button type="button" class="rt-flag-btn" [class.active]="flagged()[q.id]" (click)="toggleFlag(q.id)"
+                  [attr.aria-pressed]="!!flagged()[q.id]" [disabled]="isSubmitted()"
+                  [attr.aria-label]="'Đánh dấu câu ' + q.questionNumber + ' để ôn lại'">🚩</button>
+              </p>
               <div class="rt-opts">
                 @for (opt of q.options; track $index; let oi = $index) {
                   <button
@@ -117,14 +190,33 @@
                     [class.wrong]="isSubmitted() && selected()[q.id] === oi && oi !== q.correctAnswer"
                     (click)="select(q.id, oi)"
                     [disabled]="isSubmitted()"
+                    [attr.aria-pressed]="selected()[q.id] === oi"
                   >{{ getOptionLetter(oi) }}. {{ opt }}</button>
                 }
               </div>
+              @if (isSubmitted()) {
+                <details class="rt-review">
+                  <summary>Xem giải thích</summary>
+                  <p class="rt-explanation"><strong>Giải thích:</strong> {{ q.explanation || 'Chưa có giải thích cho câu này.' }}</p>
+                  @if (q.translation) {
+                    <p class="rt-translation"><strong>Dịch:</strong> {{ p.translation }}</p>
+                  }
+                </details>
+              }
             </div>
           }
         </div>
       }
     </section>
+  }
+
+  @if (showConfirmSubmitModal()) {
+    <app-confirm-modal
+      title="Nộp bài sớm?"
+      message="Bạn còn {{ totalQuestions() - answeredCount() }} câu chưa trả lời. Nộp bài và tính các câu này là sai?"
+      (confirm)="onSubmitModalResponse(true)"
+      (cancel)="onSubmitModalResponse(false)"
+    />
   }
 
   @if (showConfirmLeaveModal()) {

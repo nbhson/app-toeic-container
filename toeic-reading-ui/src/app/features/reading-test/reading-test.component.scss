@@ -169,3 +169,178 @@
 .rt-opt:disabled {
   cursor: default;
 }
+
+// ── Question navigator palette ──────────────────────────────
+
+.rt-palette {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.rt-palette-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.78rem;
+  opacity: 0.75;
+  flex-wrap: wrap;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .lg {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    display: inline-block;
+
+    &.lg-answered {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    &.lg-flag {
+      background: var(--warning);
+      border-color: var(--warning);
+    }
+  }
+}
+
+.rt-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr));
+  gap: 0.35rem;
+  max-height: 9.5rem;
+  overflow-y: auto;
+}
+
+.rt-dot {
+  min-width: 2.1rem;
+  padding: 0.28rem 0.15rem;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.rt-dot.answered {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: var(--primary);
+}
+
+.rt-dot.flagged {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: var(--warning);
+}
+
+.rt-dot:hover {
+  border-color: var(--primary);
+}
+
+.rt-flag-count {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+// Flag toggle inside a question stem
+.rt-flag-btn {
+  margin-left: 0.4rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.35;
+  vertical-align: middle;
+  transition: opacity 0.15s ease;
+}
+
+.rt-flag-btn:hover:not(:disabled) {
+  opacity: 0.7;
+}
+
+.rt-flag-btn.active {
+  opacity: 1;
+}
+
+// ── Post-test review (explanations) ─────────────────────────
+
+.rt-review {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: rgba(99, 102, 241, 0.06);
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--primary);
+    user-select: none;
+  }
+
+  p {
+    margin: 0.5rem 0 0.25rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+}
+
+.rt-translation {
+  opacity: 0.85;
+}
+
+// ── Score trend (mini bar chart) ────────────────────────────
+
+.rt-trend {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.rt-trend-label {
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+.rt-trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 4.5rem;
+  padding: 0.25rem 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.rt-trend-bar {
+  flex: 1;
+  max-width: 2rem;
+  border-radius: 0.35rem 0.35rem 0 0;
+  background: linear-gradient(180deg, var(--primary), rgba(99, 102, 241, 0.35));
+  min-height: 4px;
+
+  &.is-latest {
+    background: linear-gradient(180deg, var(--success), rgba(16, 185, 129, 0.35));
+  }
+}
+
+// Responsive: palette scrolls horizontally-friendly on small screens
+@media (max-width: 640px) {
+  .rt-timerbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .rt-palette-grid {
+    grid-template-columns: repeat(auto-fill, minmax(2.1rem, 1fr));
+    max-height: 8rem;
+  }
+}

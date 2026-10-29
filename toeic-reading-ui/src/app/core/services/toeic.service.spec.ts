@@ -293,14 +293,15 @@ describe('ToeicService', () => {
       service.setApiKey('fake-key');
       (omnirouteServiceMock.generateToeicQuestions as any).mockRejectedValue(new Error('API Error'));
 
-      await expect(service.loadPracticeQuestions(5)).rejects.toThrow('OmniRoute API');
+      // Specific provider errors are preserved (not masked by a generic message)
+      await expect(service.loadPracticeQuestions(5)).rejects.toThrow('API Error');
     });
 
     it('should throw error when OmniRoute returns empty array', async () => {
       service.setApiKey('fake-key');
       (omnirouteServiceMock.generateToeicQuestions as any).mockResolvedValue([]);
 
-      await expect(service.loadPracticeQuestions(5)).rejects.toThrow('Không thể kết nối');
+      await expect(service.loadPracticeQuestions(5)).rejects.toThrow('Không nhận được danh sách câu hỏi hợp lệ');
     });
 
     it('should cache and return questions on success', async () => {
