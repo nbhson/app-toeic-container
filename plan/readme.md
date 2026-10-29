@@ -33,3 +33,69 @@
 
 ### Vòng 1
 - Self-review: whitelist key name khớp với `toeic.routes.js:55` (chỉ đọc `omniroute`). Test `succeeds even if key does not exist` cũ chính là assert hành vi inject — đổi thành test chặn non-whitelist. Batch cap 20 không phá UI (UI chỉ gửi ≤4 batch/part test).
+
+---
+
+# Round 2 (2026-10-29) — Enterprise upgrade
+
+## Kết quả Review (audit đợt 2)
+
+### Backend (toeic-reading-be)
+
+| # | Severity | Vị trí | Vấn đề | Fix |
+|---|----------|--------|--------|-----|
+| R2-1 | MAJOR | routes/toeic.routes.js (part5/6/7 + batch) | Không có rate limit trên các endpoint gọi AI → 1 client có thể đốt quota/generation farm | Rate limiter in-memory (token bucket theo IP), chỉ áp cho POST generation, cấu hình qua env |
+| R2-2 | MAJOR | routes/stats.routes.js PUT | Chấp nhận stats BẤT KỲ (số âm, NaN, string, history item lạ) → store hỏng, analytics sai | Validate + normalize (số nguyên ≥0, cap history, kiểm tra shape entry) |
+| R2-3 | MAJOR | routes/toeic.routes.js | 4 handler part5/6/7/batch trùng lặp ~90% (validate → sample bank → generate → merge) | Tách helper chung `handleGeneration` + validator dùng lại |
+| R2-4 | MINOR | routes/stats.routes.js | `:userId` validate lặp 4 lần | `param('userId')` middleware dùng chung |
+| R2-5 | MINOR | db/stats-store.js | `writeFileSync` thẳng vào file đích → crash giữa chừng làm hỏng file stats | Ghi file tạm + rename (atomic) |
+| R2-6 | MINOR | routes/reading-test.routes.js | Item trong `answers` không kiểm tra shape (object/number) → tính điểm bằng dữ liệu rác | Validate từng item, 400 khi sai |
+| R2-7 | FEATURE | — | Không có lịch sử điểm thi thử server-side → không vẽ được xu hướng điểm | Store `data/test-history/{userId}.json` + POST/GET/DELETE `/api/toeic/reading-test/history/:userId` (cap 100 bài) |
+
+### Frontend (toeic-reading-ui)
+
+| # | Severity | Vị trí | Vấn đề | Fix |
+|---|----------|--------|--------|-----|
+| R2-8 | MAJOR (test đỏ sẵn) | core/services/toeic.service.spec.ts:77 | Spec dùng `STORAGE_KEYS.API_KEY` — const đã bị xóa từ trước → `ng test` KHÔNG compile được (pre-existing failure, xác nhận tại commit `a6db57e`) | Đổi sang `STORAGE_KEYS.OMNIROUTE_API_KEY` |
+| R2-9 | MAJOR | reading-test.component.ts | Đồng hồ đếm ngược dùng `setInterval` trừ 1s → trôi so với đồng hồ thật (tab background) | Tính remaining từ `endTime` (Date.now()) mỗi tick |
+| R2-10 | MAJOR | reading-test.component.ts | `confirm()` native khi nộp bài thiếu câu — trong khi app đã có ConfirmModalComponent → UX không nhất quán | Dùng modal của app |
+| R2-11 | MINOR | dashboard.component.ts/.html | 7 computed accuracy copy-paste + 7 khối HTML category copy-paste | Mỗi cái 1 vòng `@for`/computed map theo config category |
+| R2-12 | MINOR | toeic.service.ts | Bắt mọi lỗi API rồi ném message chung → mất message cụ thể từ BE (vd "apiKey is required") | Ưu tiên message gốc, chỉ fallback khi trống |
+| R2-13 | MINOR | reading-test.component.html | `[innerHTML]="p.text"` (Part 7) — Angular tự sanitize (đã kiểm tra: không có bypassSecurityTrust) nhưng nên ghi nhận + giữ chuẩn hóa; không đổi sang raw HTML | Ghi nhận, giữ sanitize mặc định |
+| R2-14 | MINOR | toàn UI | A11y: option button thiếu `aria-pressed`, timer không `aria-live`, thiếu focus-visible cho nav | Bổ sung aria + focus style |
+| R2-15 | FEATURE | — | Sau thi chỉ thấy đúng/sai, không có giải thích để ôn lại | Xem lại có đáp án + giải thích + dịch (collapsible) sau khi nộp |
+| R2-16 | UX | reading-test | Thiếu navigator/bảng câu hỏi + flag đánh dấureview — trải nghiệm thi thật | Question palette (đã làm/chưa/flag), click nhảy tới câu, flag |
+| R2-17 | FEATURE | — | Không có "sổ tay câu sai" chuyên trang | Trang `/notebook`: câu sai, đáp án đúng/sai, đánh dấu đã ôn (lưu localStorage) |
+
+## Trạng thái Round 2
+
+- [x] Deep review BE + FE
+- [x] Update plan
+- [x] BE: rate limit, stats validation, atomic write, dedupe routes, test-history store
+- [x] UI: fix spec compile, dashboard dedupe, reading-test (timer, modal, navigator+flag, review explanations), notebook page, test-history trend, a11y
+- [x] Build + test xanh cả BE & FE (FE thất bại pre-existing đã xác minh + fix)
+- [x] Commits nhỏ kiểu conventional, local only
+- [x] Self-review diff
+
+## Trạng thái Round 2 (chốt — phiên xác minh 2026-10-29)
+
+Phiên trước để notebook (R2-17) chưa commit + 1 lỗi template. Đã verify lại
+toàn bộ item rồi hoàn tất nốt phần còn thiếu:
+
+| Item | Trạng thái cuối |
+|------|-----------------|
+| R2-1 → R2-7 (BE) | Đã verify có thật trong code + test (rate limiter `middleware/rate-limit.js`, `sanitizeStats`, atomic write, `handleGeneration`, `router.param`, atomic JSON, validate answers, store `test-history-store.js` + 3 endpoints) |
+| R2-8 → R2-13, R2-15, R2-16 | Đã verify có thật (spec compile fix, drift-free timer từ `endTime`, ConfirmModal, dashboard `categoryRows` + `@for`, BE error message passthrough, innerHTML sanitize giữ mặc định, review collapsible, palette + flag) |
+| R2-14 (a11y) | **Trước đó thiếu 2 phần** — đã hoàn tất: `:focus-visible` global + `.sr-only` (`_reset.scss`), live-region thông báo mốc 10/5/1 phút cho timer, `aria-pressed` cho option/translate ở part5/6/7 |
+| R2-17 (notebook) | **Trước đó chưa commit, có bug `item.part`** — đã fix (`partLabel`), bỏ field `translation` chết, thêm sidebar entry + route + spec (7 tests) |
+
+Commit kết thúc round: `97eb60f` (notebook), `d8e4d0d` (a11y timer/focus),
+`60b644c` (aria-pressed practice + budget), cộng commit nhỏ sau self-review.
+
+- [x] Build FE sạch (không còn warning budget — `anyComponentStyle` 8kB/12kB khớp thực tế 6 component ~4.3–7.9kB)
+- [x] Test: BE vitest 159/159; FE vitest 235/235 (20 file)
+- [x] Tính năng round 2: thi thử có giờ (đếm drift-free + tự nộp), xu hướng điểm server-side, review giải thích/dịch sau nộp, palette + flag, sổ tay câu sai `/notebook`
+
+## Review Log Round 2
+
+- Self-review: whitelist key name khớp với `toeic.routes.js:55` (chỉ đọc `omniroute`). Test `succeeds even if key does not exist` cũ chính là assert hành vi inject — đổi thành test chặn non-whitelist. Batch cap 20 không phá UI (UI chỉ gửi ≤4 batch/part test).
