@@ -40,5 +40,10 @@ export const routes: Routes = [
       ),
     canDeactivate: [pendingChangesGuard],
   },
+  {
+    path: 'notebook',
+    loadComponent: () =>
+      import('../../features/notebook/notebook.component').then((m) => m.NotebookComponent),
+  },
   { path: '**', redirectTo: EMPTY_STRING },
 ];

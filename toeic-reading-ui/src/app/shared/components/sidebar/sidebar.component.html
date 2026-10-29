@@ -17,6 +17,7 @@
       routerLink="/"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
       class="nav-item"
     >
       <svg
@@ -36,7 +37,7 @@
       </svg>
       Thống Kê
     </a>
-    <a routerLink="/practice-part5" routerLinkActive="active" class="nav-item">
+    <a routerLink="/practice-part5" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
@@ -52,7 +53,7 @@
       </svg>
       Luyện Tập Part 5
     </a>
-    <a routerLink="/practice-part6" routerLinkActive="active" class="nav-item">
+    <a routerLink="/practice-part6" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
@@ -71,7 +72,7 @@
       </svg>
       Luyện Tập Part 6
     </a>
-    <a routerLink="/practice-part7" routerLinkActive="active" class="nav-item">
+    <a routerLink="/practice-part7" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
@@ -88,7 +89,7 @@
       </svg>
       Luyện Tập Part 7
     </a>
-    <a routerLink="/reading-test" routerLinkActive="active" class="nav-item">
+    <a routerLink="/reading-test" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
@@ -103,6 +104,22 @@
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
       Thi Thử Reading
+    </a>
+    <a routerLink="/notebook" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="nav-icon"
+      >
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+        <path d="M22 3h-6a2 2 0 0 0-2 2v16a3 3 0 0 1 3-3h5z"></path>
+      </svg>
+      Sổ Tay Câu Sai
     </a>
     <button #settingsBtn (click)="openSettings()" class="nav-item btn-settings">
       <svg

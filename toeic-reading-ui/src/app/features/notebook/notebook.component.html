@@ -1,0 +1,88 @@
+<div class="nb-container animate-fade">
+  <header class="nb-header animate-slide-up">
+    <div>
+      <h1 class="page-title">Sổ tay câu sai</h1>
+      <p class="page-subtitle">
+        Tập hợp các câu bạn từng trả lời sai (theo lần làm gần nhất) để ôn lại theo phương pháp spaced repetition.
+      </p>
+    </div>
+    @if (reviewedCount() > 0) {
+      <button type="button" class="btn-secondary nb-clear" (click)="clearReviewed()">
+        Bỏ dấu tất cả "đã ôn" ({{ reviewedCount() }})
+      </button>
+    }
+  </header>
+
+  <div class="nb-summary glass-card animate-slide-up">
+    <div class="nb-summary-item">
+      <span class="nb-stat-value">{{ items().length }}</span>
+      <span class="nb-stat-label">Câu từng sai</span>
+    </div>
+    <div class="nb-summary-divider" aria-hidden="true"></div>
+    <div class="nb-summary-item">
+      <span class="nb-stat-value">{{ pendingItems().length }}</span>
+      <span class="nb-stat-label">Chưa ôn lại</span>
+    </div>
+    <div class="nb-summary-divider" aria-hidden="true"></div>
+    <div class="nb-summary-item">
+      <span class="nb-stat-value">{{ reviewedCount() }}</span>
+      <span class="nb-stat-label">Đã ôn</span>
+    </div>
+    <label class="nb-filter">
+      <input
+        type="checkbox"
+        [checked]="showReviewed()"
+        (change)="showReviewed.set(!showReviewed())"
+      />
+      Hiện cả câu đã ôn
+    </label>
+  </div>
+
+  @for (item of items(); track item.questionId) {
+    @if (showReviewed() || !item.reviewed) {
+      <article class="glass-card nb-item animate-slide-up" [class.nb-reviewed]="item.reviewed">
+        <div class="nb-item-head">
+          <span class="nb-part-tag">{{ item.partLabel }}</span>
+          <span class="nb-time">{{ formatDate(item.timestamp) }}</span>
+          @if (item.reviewed) {
+            <span class="nb-reviewed-badge">Đã ôn ✓</span>
+          }
+        </div>
+        <p class="nb-question">{{ item.questionBody }}</p>
+        <div class="nb-answers">
+          <span class="nb-chip nb-chip-wrong">
+            Bạn chọn: {{ item.selectedAnswer >= 0 ? getOptionLetter(item.selectedAnswer) : '—' }}
+          </span>
+          <span class="nb-chip nb-chip-correct">Đáp án đúng: {{ getOptionLetter(item.correctAnswer) }}</span>
+        </div>
+        @if (item.explanation) {
+          <p class="nb-explanation"><strong>Giải thích:</strong> {{ item.explanation }}</p>
+        }
+        <div class="nb-actions">
+          <button
+            type="button"
+            class="nb-review-btn"
+            [class.reviewed]="item.reviewed"
+            (click)="toggleReviewed(item.questionId)"
+            [attr.aria-pressed]="item.reviewed"
+          >
+            {{ item.reviewed ? 'Đã ôn lại ✓' : 'Đánh dấu đã ôn' }}
+          </button>
+          @if (item.partLabel === 'Part 7') {
+            <a routerLink="/practice-part7" class="nb-practice">Luyện Part 7 →</a>
+          } @else if (item.partLabel === 'Part 6') {
+            <a routerLink="/practice-part6" class="nb-practice">Luyện Part 6</a>
+          } @else {
+            <a routerLink="/practice-part5" class="nb-practice">Luyện Part 5</a>
+          }
+        </div>
+      </article>
+    }
+  } @empty {
+    <div class="glass-card nb-empty animate-fade">
+      <p class="nb-empty-title">Sổ tay trống 🎉</p>
+      <p class="nb-empty-sub">Chưa có câu nào sai được ghi lại. Hãy luyện tập hoặc thi thử — câu sai sẽ tự động vào đây.</p>
+      <a routerLink="/practice-part5" class="btn-primary">Bắt đầu luyện tập</a>
+    </div>
+  }
+</div>
