@@ -1,5 +1,7 @@
 # TOEIC Reading Container
 
+[![CI](https://github.com/nbhson/app-toeic-container/actions/workflows/ci.yml/badge.svg)](https://github.com/nbhson/app-toeic-container/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Monorepo chứa frontend (Angular), backend (Node.js/Express) và OmniRoute (AI proxy) cho ứng dụng luyện đọc TOEIC, chạy bằng Docker.
 
 ## Cấu trúc thư mục
