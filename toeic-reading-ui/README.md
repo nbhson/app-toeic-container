@@ -46,6 +46,7 @@ Dự án sử dụng **Backend Server** được xây dựng bằng Node.js/Expr
 
 - **Express.js**: Web framework chính của BE.
 - **CORS**: Cho phép giao tiếp cross-origin giữa UI (`localhost:4200`) và BE (`localhost:3000`).
+- **Gemini Proxy**: BE proxy các lời gọi Gemini (`/api/toeic/gemini/generate`) — API key nằm ở BE env/key store, không bao giờ xuống client.
 - **dotenv**: Quản lý cấu hình qua file `.env`.
 - **JSON File-based Key Store**: Lưu trữ API Key (OmniRoute) trên server tại `data/keys.json`, hỗ trợ GET/PUT/DELETE qua REST API.
 - **JSON File-based Stats Store**: Lưu trữ thống kê người dùng trên server tại `data/stats/{userId}.json`, hỗ trợ multi-user, GET/PUT/DELETE qua REST API.
@@ -106,8 +107,8 @@ Dự án được xây dựng và tối ưu trên nền tảng các công nghệ
   - `reading-test`: Thi thử Reading chuẩn ETS — 100 câu, countdown 75 phút, tự nộp khi hết giờ, chấm điểm 5–495 qua BE, xem đáp án đúng/sai chi tiết.
 - **Singleton Service**: `ToeicService` đóng vai trò quản lý State tập trung bằng Signal. Thống kê lưu trên **Backend Server** (fallback localStorage khi BE offline).
 - **Multi-Provider AI Services**: Hỗ trợ đồng thời nhiều nhà cung cấp AI:
-  - `GeminiService` — Gọi Google Gemini API (REST API trực tiếp từ UI).
-  - `OmnirouteService` — Gọi BE Server (`localhost:3000`) để thực hiện OmniRoute API calls.
+  - `GeminiService` — Gọi Gemini qua BE proxy (`/api/toeic/gemini/generate`), không gọi Google trực tiếp từ browser.
+  - `OmnirouteService` — Gọi BE Server để thực hiện OmniRoute API calls.
   - `ToeicService` tự động chọn provider dựa trên API Key đã cấu hình (OmniRoute ưu tiên).
 
 ```mermaid
@@ -170,7 +171,7 @@ graph TD
   - `Resource API` tự động gọi `ToeicService` nạp nội dung. Hệ thống sinh mã định danh duy nhất (`question.id-sessionId`) để đóng gói câu hỏi độc lập.
   - `ToeicService` chọn AI provider dựa trên API Key đã cấu hình (OmniRoute ưu tiên, Gemini dự phòng).
   - **OmniRoute flow**: `ToeicService` → `OmnirouteService` → BE Server → OmniRoute API → Kết quả trả về UI.
-  - **Gemini flow**: `ToeicService` → `GeminiService` → Google Gemini API trực tiếp → Kết quả trả về UI.
+  - **Gemini flow**: `ToeicService` → `GeminiService` → BE proxy (`/api/toeic/gemini/generate`, key ở BE) → Google Gemini API → Kết quả trả về UI.
   - Mô hình AI trả về dữ liệu cấu trúc chuẩn JSON, được cache vào map và hiển thị lên giao diện.
   - Khi nộp bài, `ToeicService.saveAnswer()` nhận dữ liệu, tính toán tỉ lệ chính xác và ghi nhận trực tiếp vào Signal lịch sử `stats` toàn cục.
 

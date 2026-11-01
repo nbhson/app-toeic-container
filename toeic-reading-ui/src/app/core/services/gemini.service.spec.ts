@@ -100,7 +100,7 @@ describe('GeminiService', () => {
       await expect(service.generateToeicQuestions(1, 'fake-key')).rejects.toThrow();
     });
 
-    it('should call the correct API endpoint', async () => {
+    it('should call the BE proxy endpoint (never Google directly)', async () => {
       const mockResponse = {
         candidates: [
           {
@@ -116,10 +116,13 @@ describe('GeminiService', () => {
 
       expect(httpClientMock.post).toHaveBeenCalledTimes(1);
       const [url, body, options] = (httpClientMock.post as any).mock.calls[0];
-      expect(url).toContain('generativelanguage.googleapis.com');
-      expect(url).toContain('gemini-2.5-flash');
-      expect(url).toContain('key=test-key');
+      // Relative BE proxy path — no third-party host, no key in the URL.
+      expect(url).toContain('/api/toeic/gemini/generate');
+      expect(url).not.toContain('generativelanguage.googleapis.com');
+      expect(url).not.toContain('key=');
       expect(body.contents[0].parts[0].text).toContain('TOEIC Part 5');
+      // BYO-key override is passed in the body; BE resolves its own key when absent.
+      expect(body.apiKey).toBe('test-key');
       expect(options.headers['Content-Type']).toBe('application/json');
     });
   });

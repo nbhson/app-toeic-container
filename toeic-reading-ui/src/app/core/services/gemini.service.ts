@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ToeicQuestion, ToeicPart6Passage, ToeicPart7Passage } from '../models/toeic.model';
-import { GEMINI_CONFIG } from '../constants/app.constants';
+import { BE_GEMINI_URL } from '../constants/app.constants';
 
 @Injectable({
   providedIn: 'root',
@@ -13,16 +13,21 @@ export class GeminiService {
   constructor() {}
 
   /**
-   * Helper method to call Gemini API
+   * Helper method to call Gemini via the backend proxy (/api/toeic/gemini/generate).
+   * The browser never talks to Google directly: the BE resolves the API key
+   * server-side (body override -> BE key store -> GEMINI_API_KEY env) and
+   * forwards the request, so no key is embedded in client code or URLs.
    */
   private async generateContent<T>(
     prompt: string,
     responseSchema: any,
     apiKey: string,
   ): Promise<T> {
-    const url = `${GEMINI_CONFIG.API_BASE_URL}/${GEMINI_CONFIG.MODEL}:generateContent?key=${apiKey}`;
-
-    const requestBody = {
+    const requestBody: {
+      contents: Array<{ parts: Array<{ text: string }> }>;
+      generationConfig: Record<string, unknown>;
+      apiKey?: string;
+    } = {
       contents: [
         {
           parts: [
@@ -37,10 +42,14 @@ export class GeminiService {
         responseSchema,
       },
     };
+    // Optional BYO-key override; when omitted the BE uses its stored/env key.
+    if (apiKey) {
+      requestBody.apiKey = apiKey;
+    }
 
     try {
       const responseData = await firstValueFrom(
-        this.http.post<any>(url, requestBody, {
+        this.http.post<any>(BE_GEMINI_URL, requestBody, {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -55,7 +64,7 @@ export class GeminiService {
 
       return JSON.parse(textResult) as T;
     } catch (error) {
-      console.error('Lỗi khi gọi Gemini API:', error);
+      console.error('Lỗi khi gọi Gemini API (qua BE proxy):', error);
       throw error;
     }
   }

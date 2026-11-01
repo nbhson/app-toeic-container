@@ -19,7 +19,7 @@ jobs:
       - run: npm run test:be
 
   frontend:
-    name: Frontend build (Angular)
+    name: Frontend build + tests (Angular)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,4 +28,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:ui
       - run: npm run build:ui

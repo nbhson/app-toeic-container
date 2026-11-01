@@ -2,12 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { assertProductionSecurity } from './utils/startup-checks.js';
 import toeicRoutes from './routes/toeic.routes.js';
 import keysRoutes from './routes/keys.routes.js';
 import statsRoutes from './routes/stats.routes.js';
 import bankRoutes from './routes/bank.routes.js';
 import readingTestRoutes from './routes/reading-test.routes.js';
 import notebookRoutes from './routes/notebook.routes.js';
+import geminiRoutes from './routes/gemini.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +62,7 @@ function requireAdminKey(req, res, next) {
 // NOTE: never log or echo req.body.apiKey — API keys must not leak into logs.
 app.use('/api/toeic/bank', bankRoutes);
 app.use('/api/toeic/reading-test', readingTestRoutes);
+app.use('/api/toeic/gemini', geminiRoutes);
 app.use('/api/toeic', toeicRoutes);
 app.use('/api/toeic/keys', requireAdminKey, keysRoutes);
 app.use('/api/toeic/notebook', notebookRoutes);
@@ -85,6 +88,14 @@ app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err instanceof Error ? err.stack : err);
   res.status(500).json({ error: 'Internal server error.' });
 });
+
+// Refuse to boot in production with an open /keys endpoint (dev keeps warn-free open behavior).
+try {
+  assertProductionSecurity(process.env);
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
 
 app.listen(PORT, () => {
   console.log(`TOEIC Reading BE server is running on http://localhost:${PORT}`);

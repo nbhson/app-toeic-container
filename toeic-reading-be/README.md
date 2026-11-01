@@ -86,6 +86,22 @@ curl -X PUT http://localhost:3000/api/toeic/keys \
 curl -X DELETE http://localhost:3000/api/toeic/keys/omniroute
 ```
 
+> **Bảo mật /keys:** đặt `ADMIN_API_KEY` trong `.env` để các endpoint trên yêu cầu header `X-API-Key: <ADMIN_API_KEY>`. Khi `NODE_ENV=production`, server **từ chối khởi động** nếu biến này thiếu.
+
+### Gemini Proxy
+
+| Method | Endpoint | Body | Mô tả |
+|--------|----------|------|-------|
+| `POST` | `/api/toeic/gemini/generate` | `{ contents, generationConfig?, model?, apiKey? }` | Proxy gọi Gemini generateContent; key resolve theo thứ tự body → key store (`gemini`) → `GEMINI_API_KEY` env. Trả về JSON gốc của Gemini. |
+
+```bash
+curl -X POST http://localhost:3000/api/toeic/gemini/generate \
+  -H "Content-Type: application/json" \
+  -d '{"contents": [{"parts": [{"text": "Xin chào"}]}]}'
+```
+
+Browser không bao giờ gọi Google trực tiếp và không thấy API key (key được gửi qua header `x-goog-api-key` từ BE).
+
 ### User Stats (Multi-user)
 
 | Method | Endpoint | Body | Mô tả |
